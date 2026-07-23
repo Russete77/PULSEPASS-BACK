@@ -1,0 +1,10 @@
+**/node_modules
+**/dist
+**/.expo
+**/.env
+**/.env.*
+!**/.env.example
+**/.git
+**/*.log
+_PLANO_90
+design-system

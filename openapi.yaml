@@ -1,0 +1,347 @@
+openapi: 3.1.0
+info:
+  title: PulsePass API
+  version: "1.0.0"
+  description: >
+    Backend único do PulsePass (ticketeria + guest list + bar cashless),
+    organizado em módulos verticais. Contrato oficial em /api/v1; /api segue
+    como alias não-versionado (compat). Envelope padrão de resposta: { "data": ... }.
+servers:
+  - url: /api/v1
+    description: Contrato versionado (oficial)
+  - url: /api
+    description: Alias não-versionado (legado/compat)
+tags:
+  - name: health
+  - name: catalog
+  - name: tickets
+  - name: orders
+  - name: cashless
+  - name: guestlist
+  - name: admin
+  - name: webhooks
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Access token do Supabase Auth.
+  parameters:
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: false
+      schema: { type: string }
+      description: Repetições com a mesma chave não geram novo pedido/cobrança.
+  schemas:
+    Envelope:
+      type: object
+      properties:
+        data: {}
+    Error:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            message: { type: string }
+            details: {}
+    OrderCreate:
+      type: object
+      required: [eventSlug, items]
+      properties:
+        eventSlug: { type: string }
+        items:
+          type: array
+          items:
+            type: object
+            required: [ticket_tier_id, quantity]
+            properties:
+              ticket_tier_id: { type: string, format: uuid }
+              quantity: { type: integer, minimum: 1 }
+              half: { type: boolean, description: meia-entrada (usa half_price_cents do lote) }
+        couponCode: { type: string }
+        paymentMethod: { type: string, enum: [pix, card] }
+        installmentCount: { type: integer, minimum: 1, maximum: 12 }
+        card:
+          type: object
+          properties:
+            holderName: { type: string }
+            number: { type: string }
+            expiryMonth: { type: string }
+            expiryYear: { type: string }
+            ccv: { type: string }
+        holderInfo:
+          type: object
+          properties:
+            name: { type: string }
+            email: { type: string, format: email }
+            cpfCnpj: { type: string }
+            postalCode: { type: string }
+            addressNumber: { type: string }
+            phone: { type: string }
+    TopupCreate:
+      type: object
+      required: [amount_cents]
+      properties:
+        eventId: { type: string, format: uuid }
+        amount_cents: { type: integer, minimum: 500 }
+        paymentMethod: { type: string, enum: [pix, card] }
+        installmentCount: { type: integer, minimum: 1, maximum: 12 }
+    BarOrderCreate:
+      type: object
+      required: [eventSlug, items]
+      properties:
+        eventSlug: { type: string }
+        items:
+          type: array
+          items:
+            type: object
+            required: [menu_item_id, quantity]
+            properties:
+              menu_item_id: { type: string, format: uuid }
+              quantity: { type: integer, minimum: 1 }
+              notes: { type: string }
+security:
+  - bearerAuth: []
+paths:
+  /health:
+    get: { tags: [health], security: [], summary: Liveness, responses: { "200": { description: OK } } }
+  /health/ready:
+    get: { tags: [health], security: [], summary: Readiness (probe do banco), responses: { "200": { description: pronto }, "503": { description: degradado } } }
+
+  /events:
+    get:
+      tags: [catalog]
+      security: []
+      summary: Catálogo público de eventos publicados
+      parameters:
+        - { name: city, in: query, schema: { type: string } }
+        - { name: q, in: query, schema: { type: string } }
+      responses: { "200": { description: lista } }
+  /events/{slug}:
+    get:
+      tags: [catalog]
+      security: []
+      summary: Detalhe do evento + lotes
+      parameters: [{ name: slug, in: path, required: true, schema: { type: string } }]
+      responses: { "200": { description: evento }, "404": { description: não encontrado } }
+  /events/{slug}/menu:
+    get:
+      tags: [catalog]
+      security: []
+      summary: Cardápio público do bar
+      parameters: [{ name: slug, in: path, required: true, schema: { type: string } }]
+      responses: { "200": { description: cardápio }, "404": { description: indisponível } }
+
+  /tickets:
+    get: { tags: [tickets], summary: Meus ingressos, responses: { "200": { description: lista }, "401": { description: sem auth } } }
+  /tickets/{id}:
+    get:
+      tags: [tickets]
+      summary: Detalhe de um ingresso (com QR)
+      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses: { "200": { description: ingresso }, "404": { description: não encontrado } }
+  /tickets/{id}/transfer:
+    post:
+      tags: [tickets]
+      summary: Transferir ingresso por e-mail
+      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [toEmail], properties: { toEmail: { type: string, format: email } } } } }
+      responses: { "200": { description: resultado } }
+
+  /orders:
+    get:
+      tags: [orders]
+      summary: Meus pedidos (histórico do comprador)
+      responses: { "200": { description: lista } }
+    post:
+      tags: [orders]
+      summary: Criar pedido de ingresso (PIX/cartão/cupom)
+      parameters: [{ $ref: "#/components/parameters/IdempotencyKey" }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/OrderCreate" } } } }
+      responses: { "201": { description: pedido criado (pix ou cartão) }, "409": { description: esgotado/lote inválido } }
+  /orders/{id}:
+    get:
+      tags: [orders]
+      summary: Consultar pedido
+      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses: { "200": { description: pedido } }
+  /orders/{id}/refund:
+    post:
+      tags: [orders]
+      summary: Reembolsar pedido pago
+      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses: { "200": { description: reembolso } }
+  /orders/{id}/simulate-paid:
+    post:
+      tags: [orders]
+      summary: "(DEV) Simular confirmação de pagamento"
+      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses: { "200": { description: confirmado } }
+
+  /wallet:
+    get:
+      tags: [cashless]
+      summary: Saldo + extrato da carteira
+      parameters: [{ name: eventId, in: query, schema: { type: string, format: uuid } }]
+      responses: { "200": { description: carteira } }
+  /wallet/refund:
+    post: { tags: [cashless], summary: Estornar saldo da carteira, responses: { "200": { description: estorno } } }
+  /wallet/topups:
+    post:
+      tags: [cashless]
+      summary: Criar recarga (PIX/cartão)
+      parameters: [{ $ref: "#/components/parameters/IdempotencyKey" }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/TopupCreate" } } } }
+      responses: { "201": { description: recarga } }
+  /wallet/topups/{id}:
+    get:
+      tags: [cashless]
+      summary: Consultar recarga
+      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses: { "200": { description: recarga } }
+  /wallet/topups/{id}/simulate-paid:
+    post:
+      tags: [cashless]
+      summary: "(DEV) Simular recarga paga"
+      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses: { "200": { description: creditado } }
+  /bar-orders:
+    post:
+      tags: [cashless]
+      summary: Pedido no bar (debita saldo)
+      parameters: [{ $ref: "#/components/parameters/IdempotencyKey" }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/BarOrderCreate" } } } }
+      responses: { "201": { description: pedido }, "409": { description: saldo insuficiente } }
+    get: { tags: [cashless], summary: Meus pedidos no bar, responses: { "200": { description: lista } } }
+
+  /lists/{code}:
+    get:
+      tags: [guestlist]
+      security: []
+      summary: Página pública da lista de um promoter
+      parameters: [{ name: code, in: path, required: true, schema: { type: string } }]
+      responses: { "200": { description: lista + evento }, "404": { description: não encontrada } }
+  /lists/{code}/signup:
+    post:
+      tags: [guestlist]
+      security: []
+      summary: Inscrever-se na lista (público)
+      parameters: [{ name: code, in: path, required: true, schema: { type: string } }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [name], properties: { name: { type: string }, email: { type: string }, phone: { type: string } } } } }
+      responses: { "201": { description: inscrito } }
+
+  /promoter/me:
+    get:
+      tags: [guestlist]
+      summary: Portal do promoter — meus promoters/eventos + stats (comissão, check-ins)
+      responses: { "200": { description: dashboard do promoter } }
+  /promoter/promoters/{promoterId}/guests:
+    get:
+      tags: [guestlist]
+      summary: Portal do promoter — inscritos de um promoter meu
+      parameters: [{ name: promoterId, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses: { "200": { description: inscritos } }
+
+  /webhooks/asaas:
+    post:
+      tags: [webhooks]
+      security: []
+      summary: Webhook do Asaas (valida header asaas-access-token; idempotente)
+      responses: { "200": { description: ok }, "403": { description: token inválido } }
+
+  /admin/me:
+    get: { tags: [admin], summary: Perfil + organizações do produtor, responses: { "200": { description: me } } }
+  /admin/organizations:
+    post:
+      tags: [admin]
+      summary: Criar organização
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [name], properties: { name: { type: string }, cnpj: { type: string } } } } } }
+      responses: { "201": { description: org } }
+  /admin/organizations/{orgId}/asaas-wallet:
+    patch:
+      tags: [admin]
+      summary: Configurar carteira Asaas (split/repasse)
+      parameters: [{ name: orgId, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses: { "200": { description: org } }
+  /admin/events:
+    get: { tags: [admin], summary: Eventos da organização, responses: { "200": { description: lista } } }
+    post: { tags: [admin], summary: Criar evento (+ lotes), responses: { "201": { description: evento } } }
+  /admin/events/{id}:
+    get:
+      tags: [admin]
+      summary: Detalhe do evento (dono ou manager)
+      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses: { "200": { description: evento } }
+  /admin/events/{id}/status:
+    patch:
+      tags: [admin]
+      summary: Alterar status do evento (dono ou manager)
+      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses: { "200": { description: evento } }
+  /admin/events/{id}/dashboard:
+    get:
+      tags: [admin]
+      summary: Dashboard ao vivo (métricas)
+      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses: { "200": { description: métricas } }
+  /admin/events/{id}/staff:
+    get: { tags: [admin], summary: Listar equipe (owner-only), parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }], responses: { "200": { description: equipe } } }
+    post: { tags: [admin], summary: Adicionar staff (manager/door/bar), parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }], responses: { "201": { description: staff } } }
+  /admin/events/{id}/staff/{staffId}:
+    delete:
+      tags: [admin]
+      summary: Remover staff (owner-only)
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: staffId, in: path, required: true, schema: { type: string, format: uuid } }
+      responses: { "200": { description: removido } }
+  /admin/events/{id}/checkin:
+    post: { tags: [admin], summary: Check-in na porta (door/manager), parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }], responses: { "200": { description: resultado } } }
+  /admin/events/{id}/manifest:
+    get: { tags: [admin], summary: Manifesto offline (door/manager), parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }], responses: { "200": { description: manifesto } } }
+  /admin/events/{id}/checkin-batch:
+    post: { tags: [admin], summary: Sincronizar fila de check-ins offline, parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }], responses: { "200": { description: resultado } } }
+  /admin/events/{id}/menu:
+    get: { tags: [admin], summary: Cardápio p/ PDV (bar/manager), parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }], responses: { "200": { description: cardápio } } }
+  /admin/events/{id}/wallet-lookup:
+    get:
+      tags: [admin]
+      summary: Buscar saldo do cliente por e-mail (PDV)
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: email, in: query, required: true, schema: { type: string, format: email } }
+      responses: { "200": { description: saldo } }
+  /admin/events/{id}/pdv-charge:
+    post:
+      tags: [admin]
+      summary: PDV — cobrar do saldo do cliente (idempotente)
+      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }, { $ref: "#/components/parameters/IdempotencyKey" }]
+      responses: { "201": { description: pedido } }
+  /admin/events/{id}/promoters:
+    get: { tags: [admin], summary: Promoters + comissão do evento, parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }], responses: { "200": { description: lista } } }
+    post: { tags: [admin], summary: Criar promoter, parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }], responses: { "201": { description: promoter } } }
+  /admin/promoters/{promoterId}/guests:
+    get:
+      tags: [admin]
+      summary: Convidados de um promoter
+      parameters: [{ name: promoterId, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses: { "200": { description: convidados } }
+  /admin/promoters/{promoterId}/commission-paid:
+    post:
+      tags: [admin]
+      summary: Marcar comissão como paga/não paga
+      parameters: [{ name: promoterId, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses: { "200": { description: promoter } }
+  /admin/guests/{guestId}/checkin:
+    post:
+      tags: [admin]
+      summary: Check-in de convidado da lista
+      parameters: [{ name: guestId, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses: { "200": { description: resultado } }

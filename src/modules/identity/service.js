@@ -1,0 +1,173 @@
+// modules/identity/service.js — perfil, organização, gestão de eventos e equipe (RBAC).
+import { notFound, forbidden, badRequest } from '../../utils/ApiError.js';
+import { env } from '../../config/env.js';
+import { assertEventAccess } from './access.js';
+import * as repo from './repo.js';
+
+function slugify(text) {
+  const base = String(text).toLowerCase().normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '').slice(0, 48);
+  const suffix = Math.random().toString(36).slice(2, 6);
+  return `${base || 'item'}-${suffix}`;
+}
+
+export async function getMe({ user }) {
+  const { data: profile } = await repo.findProfile(user.id);
+  const { data: orgs, error } = await repo.findOrgsByOwner(user.id);
+  if (error) throw error;
+  return { profile, organizations: orgs ?? [] };
+}
+
+export async function createOrganization({ user, name, cnpj }) {
+  if (!name || name.trim().length < 2) throw badRequest('Nome da organização inválido');
+  const { data: org, error } = await repo.insertOrg({
+    owner_id: user.id, name: name.trim(), slug: slugify(name), cnpj: cnpj ?? null,
+  });
+  if (error) throw error;
+  await repo.setProfileRole(user.id, 'produtora');
+  return org;
+}
+
+async function assertOrgOwner(userId, orgId) {
+  const { data } = await repo.findOrgOwned(orgId, userId);
+  if (!data) throw forbidden('Organização não pertence a você');
+}
+
+/** Configura a carteira Asaas da produtora (destino do repasse/split). */
+export async function setOrgAsaasWallet({ user, orgId, asaasWalletId }) {
+  await assertOrgOwner(user.id, orgId);
+  const { data, error } = await repo.updateOrgWallet(orgId, asaasWalletId || null);
+  if (error) throw error;
+  return data;
+}
+
+async function assertEventOwner(userId, eventId) {
+  const { data: event } = await repo.findEventWithOwner(eventId);
+  if (!event) throw notFound('Evento não encontrado');
+  if (event.organizations.owner_id !== userId) throw forbidden('Sem acesso a este evento');
+  return event;
+}
+
+/**
+ * Operações de evento (detalhe, status, dashboard): dono OU manager.
+ * Gestão de equipe e wallet de repasse seguem owner-only.
+ */
+async function assertEventManage(userId, eventId, roles = ['manager']) {
+  await assertEventAccess(userId, eventId, roles);
+  const { data: event } = await repo.findEvent(eventId);
+  if (!event) throw notFound('Evento não encontrado');
+  return event;
+}
+
+export async function createEvent({ user, payload }) {
+  const { organization_id, title, description, venue_name, address, city, state, starts_at, ends_at, service_fee_bps, tiers } = payload;
+  if (!title || !city || !state || !starts_at) throw badRequest('Campos obrigatórios faltando');
+  await assertOrgOwner(user.id, organization_id);
+
+  const { data: event, error } = await repo.insertEvent({
+    organization_id, title, slug: slugify(title),
+    description: description ?? null, venue_name: venue_name ?? null, address: address ?? null,
+    city, state, starts_at, ends_at: ends_at ?? null, status: 'draft',
+    service_fee_bps: Math.min(10000, Math.max(0, Math.round(Number(service_fee_bps) || 0))),
+  });
+  if (error) throw error;
+
+  if (Array.isArray(tiers) && tiers.length) {
+    const rows = tiers.map((t, i) => ({
+      event_id: event.id, name: t.name,
+      price_cents: Math.round(Number(t.price_cents) || 0),
+      half_price_cents: t.half_price_cents != null ? Math.max(0, Math.round(Number(t.half_price_cents))) : null,
+      quantity_total: Math.round(Number(t.quantity_total) || 0),
+      sales_start: t.sales_start || null,
+      sales_end: t.sales_end || null,
+      position: i, status: 'on_sale',
+    }));
+    const { error: tErr } = await repo.insertTiers(rows);
+    if (tErr) throw tErr;
+  }
+  return getEventDetail({ user, eventId: event.id });
+}
+
+export async function getEventDetail({ user, eventId }) {
+  const event = await assertEventManage(user.id, eventId);
+  const { data: tiers } = await repo.findTiersByEvent(eventId);
+  return { ...event, organizations: undefined, tiers: tiers ?? [] };
+}
+
+export async function listMyEvents({ user, limit = 100, offset = 0 }) {
+  const { data: orgs } = await repo.findOrgIdsByOwner(user.id);
+  const orgIds = (orgs ?? []).map((o) => o.id);
+  if (!orgIds.length) return [];
+  const { data, error } = await repo.findEventsByOrgs(orgIds, { limit, offset });
+  if (error) throw error;
+  return data;
+}
+
+export async function setEventStatus({ user, eventId, status }) {
+  const allowed = ['draft', 'published', 'paused', 'ended', 'cancelled'];
+  if (!allowed.includes(status)) throw badRequest('Status inválido');
+  await assertEventManage(user.id, eventId);
+  const { data, error } = await repo.updateEventStatus(eventId, status);
+  if (error) throw error;
+  return data;
+}
+
+/** Dashboard ao vivo — métricas agregadas em SQL (RPC). */
+export async function getDashboard({ user, eventId }) {
+  await assertEventManage(user.id, eventId);
+  const { data: metrics, error: mErr } = await repo.rpcEventDashboard(eventId);
+  if (mErr) throw mErr;
+  const { data: tiers } = await repo.findTiersByEvent(eventId);
+  const { data: recent } = await repo.findRecentPaidOrders(eventId);
+  return { metrics, tiers: tiers ?? [], recent_orders: recent ?? [] };
+}
+
+/** Conciliação financeira do produtor — bruto, taxas, reembolsos e repasse líquido. */
+export async function getReconciliation({ user, eventId }) {
+  await assertEventManage(user.id, eventId);
+  const { data, error } = await repo.rpcEventReconciliation(eventId);
+  if (error) throw error;
+
+  const feePct = Number(env.asaas.platformFeePercent) || 0;
+  const netSales = (data.tickets_gross_cents || 0) - (data.refunds_cents || 0);
+  const platformFee = Math.round((netSales * feePct) / 100);
+  return {
+    ...data,
+    platform_fee_percent: feePct,
+    net_sales_cents: netSales,
+    platform_fee_cents: platformFee,
+    producer_net_cents: netSales - platformFee,
+  };
+}
+
+// ── Equipe do evento (RBAC) — apenas o dono gerencia ──
+const STAFF_ROLES = ['manager', 'door', 'bar'];
+
+export async function listEventStaff({ user, eventId }) {
+  await assertEventOwner(user.id, eventId);
+  const { data, error } = await repo.findEventStaff(eventId);
+  if (error) throw error;
+  return data ?? [];
+}
+
+export async function addEventStaff({ user, eventId, email, role }) {
+  await assertEventOwner(user.id, eventId);
+  if (!STAFF_ROLES.includes(role)) throw badRequest('Papel inválido (manager | door | bar)');
+
+  const target = await repo.findProfileByEmail(email);
+  if (!target) throw notFound('Nenhum usuário cadastrado com esse e-mail');
+
+  const { data, error } = await repo.upsertEventStaff({
+    event_id: eventId, user_id: target.id, role, created_by: user.id,
+  });
+  if (error) throw error;
+  return data;
+}
+
+export async function removeEventStaff({ user, eventId, staffId }) {
+  await assertEventOwner(user.id, eventId);
+  const { error } = await repo.deleteEventStaff(staffId, eventId);
+  if (error) throw error;
+  return { removed: true };
+}

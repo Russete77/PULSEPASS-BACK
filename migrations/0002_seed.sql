@@ -1,0 +1,13 @@
+-- ═══════════════════════════════════════════════════════════════
+-- PulsePass · 0002 — OBSOLETO (não precisa rodar).
+--
+-- O seed antigo criava um profile com UUID fake, mas profiles.id tem FK
+-- para auth.users — não é possível criar usuário só via SQL, então este
+-- arquivo quebrava num banco real.
+--
+-- O seed de demonstração foi movido para:  0014_demo_seed.sql
+-- (amarrado à SUA conta real — crie login no app, edite o e-mail no topo
+--  do 0014 e rode). Este 0002 virou no-op de propósito.
+-- ═══════════════════════════════════════════════════════════════
+
+-- (intencionalmente vazio)

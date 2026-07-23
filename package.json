@@ -1,0 +1,33 @@
+{
+  "name": "pulsepass-api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "PulsePass — backend único (ticketing + guest list + cashless). Express 5 + Supabase + Asaas.",
+  "engines": {
+    "node": ">=20.19.0"
+  },
+  "scripts": {
+    "dev": "node --watch src/server.js",
+    "start": "node src/server.js",
+    "lint": "eslint src && node scripts/check-boundaries.mjs",
+    "test": "node --test"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.45.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^5.1.0",
+    "helmet": "^8.0.0",
+    "morgan": "^1.10.0",
+    "zod": "^3.23.8"
+  },
+  "optionalDependencies": {
+    "@sentry/node": "^8.0.0",
+    "pdfkit": "^0.15.0",
+    "qrcode": "^1.5.4"
+  },
+  "devDependencies": {
+    "eslint": "^9.0.0"
+  }
+}
