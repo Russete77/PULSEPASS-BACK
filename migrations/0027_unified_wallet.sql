@@ -113,7 +113,7 @@ grant  execute on function public.credit_topup(text, int) to service_role;
 -- ── CONSOLIDAÇÃO: junta o que já existe na carteira geral (nada se perde) ──
 -- 1) garante carteira geral pra quem só tinha carteira de evento
 insert into public.wallets (profile_id, event_id, balance_cents)
-select distinct w.profile_id, null, 0 from public.wallets w
+select distinct w.profile_id, null::uuid, 0 from public.wallets w
 where w.event_id is not null
   and not exists (select 1 from public.wallets g where g.profile_id = w.profile_id and g.event_id is null);
 

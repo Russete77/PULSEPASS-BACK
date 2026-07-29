@@ -27,6 +27,9 @@ async function main() {
   await client.query(`create table if not exists public.schema_migrations (
     version text primary key, applied_at timestamptz not null default now()
   )`);
+  // Tabela de ops interna: trancada (RLS on, sem política) — nunca exposta via PostgREST.
+  await client.query('alter table public.schema_migrations enable row level security');
+  await client.query('revoke all on public.schema_migrations from anon, authenticated');
 
   const applied = new Set(
     (await client.query('select version from public.schema_migrations')).rows.map((r) => r.version),
