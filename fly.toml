@@ -1,0 +1,33 @@
+# Deploy da API no Fly.io (container Docker, região São Paulo).
+#   fly launch --no-deploy   (só na primeira vez, cria o app)
+#   fly secrets set SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... \
+#                   ASAAS_API_KEY=... ASAAS_WEBHOOK_TOKEN=... \
+#                   TICKET_QR_SECRET=... ADMIN_EMAILS=...
+#   fly deploy
+app = "pulsepass-api"
+primary_region = "gru"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  NODE_ENV = "production"
+  PORT = "4000"
+
+[http_service]
+  internal_port = 4000
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 1        # 0 economiza, mas dá cold start no 1º acesso
+
+  [[http_service.checks]]
+    interval = "15s"
+    timeout = "3s"
+    grace_period = "10s"
+    method = "get"
+    path = "/api/health"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"
