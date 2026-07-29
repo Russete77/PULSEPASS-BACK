@@ -345,3 +345,53 @@ paths:
       summary: Check-in de convidado da lista
       parameters: [{ name: guestId, in: path, required: true, schema: { type: string, format: uuid } }]
       responses: { "200": { description: resultado } }
+
+  /admin/events/{id}/menu-items:
+    get: { tags: [admin], summary: Listar cardapio (gestao), parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }], responses: { "200": { description: itens } } }
+    post: { tags: [admin], summary: Criar item de cardapio, parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }], responses: { "201": { description: item } } }
+  /admin/menu-items/{itemId}:
+    patch: { tags: [admin], summary: Editar item de cardapio, parameters: [{ name: itemId, in: path, required: true, schema: { type: string, format: uuid } }], responses: { "200": { description: item } } }
+    delete: { tags: [admin], summary: Remover item de cardapio, parameters: [{ name: itemId, in: path, required: true, schema: { type: string, format: uuid } }], responses: { "200": { description: removido } } }
+  /admin/events/{id}/coupons:
+    get: { tags: [admin], summary: Listar cupons do evento, parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }], responses: { "200": { description: cupons } } }
+    post: { tags: [admin], summary: Criar cupom, parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }], responses: { "201": { description: cupom } } }
+  /admin/coupons/{couponId}:
+    patch: { tags: [admin], summary: Ativar/desativar cupom, parameters: [{ name: couponId, in: path, required: true, schema: { type: string, format: uuid } }], responses: { "200": { description: cupom } } }
+    delete: { tags: [admin], summary: Remover cupom, parameters: [{ name: couponId, in: path, required: true, schema: { type: string, format: uuid } }], responses: { "200": { description: removido } } }
+  /admin/events/{id}/tables:
+    get: { tags: [admin], summary: Listar camarotes/mesas, parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }], responses: { "200": { description: mesas } } }
+    post: { tags: [admin], summary: Criar camarote/mesa, parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }], responses: { "201": { description: mesa } } }
+  /admin/tables/{tableId}:
+    delete: { tags: [admin], summary: Remover camarote/mesa, parameters: [{ name: tableId, in: path, required: true, schema: { type: string, format: uuid } }], responses: { "200": { description: removido } } }
+  /admin/events/{id}/reservations:
+    get: { tags: [admin], summary: Listar reservas de camarote, parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }], responses: { "200": { description: reservas } } }
+  /admin/reservations/{reservationId}:
+    patch: { tags: [admin], summary: Confirmar/recusar reserva, parameters: [{ name: reservationId, in: path, required: true, schema: { type: string, format: uuid } }], responses: { "200": { description: reserva } } }
+  /admin/events/{id}/cashier:
+    get: { tags: [admin], summary: Fechamento de caixa (por operador), parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }], responses: { "200": { description: fechamento } } }
+  /admin/events/{id}/ledger-check:
+    get: { tags: [admin], summary: Integridade do ledger (drift de saldo), parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }], responses: { "200": { description: resultado } } }
+  /admin/events/{id}/reconciliation:
+    get: { tags: [admin], summary: Conciliacao de pagamentos, parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }], responses: { "200": { description: conciliacao } } }
+  /admin/events/{id}/guests:
+    get: { tags: [admin], summary: Convidados do evento (check-in na porta), parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }], responses: { "200": { description: convidados } } }
+  /tickets/{id}/qr-token:
+    get: { tags: [tickets], summary: Token de QR rotativo (expira ~30s), parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }], responses: { "200": { description: token e qr_data_url } } }
+  /tables/event/{slug}:
+    get: { tags: [tables], security: [], summary: Camarotes publicos do evento, parameters: [{ name: slug, in: path, required: true, schema: { type: string } }], responses: { "200": { description: mesas } } }
+  /tables/{tableId}/reserve:
+    post: { tags: [tables], security: [], summary: Solicitar reserva de camarote, parameters: [{ name: tableId, in: path, required: true, schema: { type: string, format: uuid } }], responses: { "201": { description: solicitada } } }
+  /lists/{code}/hit:
+    post: { tags: [lists], security: [], summary: Beacon de clique no link do promoter, parameters: [{ name: code, in: path, required: true, schema: { type: string } }], responses: { "200": { description: ok } } }
+  /platform/whoami:
+    get: { tags: [platform], summary: Confirma acesso super-admin, responses: { "200": { description: admin } } }
+  /platform/stats:
+    get: { tags: [platform], summary: KPIs da plataforma (GMV, orgs, eventos), responses: { "200": { description: stats } } }
+  /platform/orgs:
+    get: { tags: [platform], summary: Todas as organizacoes + saude, responses: { "200": { description: orgs } } }
+  /platform/finance:
+    get: { tags: [platform], summary: Receita e repasses por org, responses: { "200": { description: financeiro } } }
+  /platform/fraud:
+    get: { tags: [platform], summary: Integridade de ledger (sinais reais), responses: { "200": { description: sinais } } }
+  /platform/activity:
+    get: { tags: [platform], summary: Trilha de atividade (audit log), responses: { "200": { description: atividade } } }
