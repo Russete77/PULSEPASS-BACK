@@ -16,7 +16,14 @@ export async function getMe({ user }) {
   const { data: profile } = await repo.findProfile(user.id);
   const { data: orgs, error } = await repo.findOrgsByOwner(user.id);
   if (error) throw error;
-  return { profile, organizations: orgs ?? [] };
+  // Escalações (porta/bar/gerente): o cockpit usa isso pra levar o staff direto
+  // pra sua tela de trabalho, em vez de mostrar o onboarding de produtora.
+  const { data: staff, error: staffErr } = await repo.findMyStaffAssignments(user.id);
+  if (staffErr) throw staffErr;
+  const assignments = (staff ?? [])
+    .filter((s) => s.events)
+    .map((s) => ({ role: s.role, event: s.events }));
+  return { profile, organizations: orgs ?? [], assignments };
 }
 
 export async function createOrganization({ user, name, cnpj }) {

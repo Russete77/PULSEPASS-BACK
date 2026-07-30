@@ -72,4 +72,12 @@ export const upsertEventStaff = (row) =>
 export const deleteEventStaff = (staffId, eventId) =>
   supabase.from('event_staff').delete().eq('id', staffId).eq('event_id', eventId);
 
+// Escalações do próprio usuário — porteiro/barman precisa saber ONDE trabalha
+// pra cair direto na tela de operação em vez do onboarding de produtora.
+export const findMyStaffAssignments = (userId) =>
+  supabase.from('event_staff')
+    .select('role, events!inner(id, title, slug, city, state, starts_at, status)')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false });
+
 export { findProfileByEmail };
