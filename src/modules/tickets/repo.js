@@ -3,7 +3,7 @@
 import { supabase, findProfileByEmail } from '../../config/supabase.js';
 
 const LIST_COLS = `
-  id, code, status, holder_name, checked_in_at, created_at,
+  id, order_id, code, status, holder_name, checked_in_at, created_at,
   events ( id, title, slug, cover_url, venue_name, city, state, starts_at ),
   ticket_tiers ( name )
 `;
