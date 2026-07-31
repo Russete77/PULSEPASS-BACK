@@ -369,6 +369,12 @@ paths:
     patch: { tags: [admin], summary: Confirmar/recusar reserva, parameters: [{ name: reservationId, in: path, required: true, schema: { type: string, format: uuid } }], responses: { "200": { description: reserva } } }
   /admin/events/{id}/cashier:
     get: { tags: [admin], summary: Fechamento de caixa (por operador), parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }], responses: { "200": { description: fechamento } } }
+  /admin/events/{id}/box-office:
+    get: { tags: [admin], summary: Abre a bilheteria (lotes a venda + caixa), parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }], responses: { "200": { description: lotes e resumo do caixa } } }
+  /admin/events/{id}/box-office/sales:
+    post: { tags: [admin], summary: Venda presencial (dinheiro/maquininha/pix manual/cortesia), parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }], responses: { "201": { description: pedido liquidado com ingressos e troco } } }
+  /admin/events/{id}/box-office/report:
+    get: { tags: [admin], summary: Fechamento do caixa da bilheteria (por forma e operador), parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }], responses: { "200": { description: fechamento } } }
   /admin/events/{id}/ledger-check:
     get: { tags: [admin], summary: Integridade do ledger (drift de saldo), parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }], responses: { "200": { description: resultado } } }
   /admin/events/{id}/reconciliation:

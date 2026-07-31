@@ -15,15 +15,37 @@ import pg from 'pg';
 
 const DIR = join(dirname(fileURLToPath(import.meta.url)), '..', 'migrations');
 const url = process.env.DATABASE_URL;
-if (!url) {
+const poolerUrl = process.env.DATABASE_URL_POOLER;
+if (!url && !poolerUrl) {
   console.error('✖ Defina DATABASE_URL (connection string do Postgres do Supabase).');
   process.exit(1);
 }
 
-const client = new pg.Client({ connectionString: url, ssl: { rejectUnauthorized: false } });
+// A "Direct connection" do Supabase resolve só em IPv6. Em rede sem IPv6 ela
+// expira sem explicação — por isso o Session pooler (IPv4, porta 5432, aceita
+// DDL) entra como alternativa automática em vez de travar a migration.
+let client;
+async function connect() {
+  let ultimoErro;
+  for (const [nome, conn] of [['direta', url], ['pooler IPv4', poolerUrl]].filter(([, c]) => c)) {
+    const c = new pg.Client({
+      connectionString: conn, ssl: { rejectUnauthorized: false }, connectionTimeoutMillis: 15000,
+    });
+    try {
+      await c.connect();
+      console.log(`· conexão ${nome}`);
+      return c;
+    } catch (e) {
+      ultimoErro = e;
+      console.log(`· conexão ${nome} indisponível (${e.code || e.message})`);
+      try { await c.end(); } catch { /* já caiu */ }
+    }
+  }
+  throw ultimoErro;
+}
 
 async function main() {
-  await client.connect();
+  client = await connect();
   await client.query(`create table if not exists public.schema_migrations (
     version text primary key, applied_at timestamptz not null default now()
   )`);

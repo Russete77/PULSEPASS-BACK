@@ -10,6 +10,7 @@ import * as promoters from '../guestlist/controller.js';
 import * as coupons from '../coupons/controller.js';
 import * as menu from '../cashless/controller.js';
 import * as tables from '../tables/controller.js';
+import * as boxoffice from '../boxoffice/controller.js';
 
 const router = Router();
 router.use(requireAuth);
@@ -37,6 +38,11 @@ router.post('/events/:id/checkin-batch', asyncHandler(ops.checkInBatch));
 router.get('/events/:id/menu', asyncHandler(ops.menu));
 router.get('/events/:id/wallet-lookup', asyncHandler(ops.walletLookup));
 router.post('/events/:id/pdv-charge', asyncHandler(ops.pdvCharge));
+
+// Bilheteria física (venda na entrada: dinheiro / maquininha / Pix manual)
+router.get('/events/:id/box-office', asyncHandler(boxoffice.open));
+router.post('/events/:id/box-office/sales', asyncHandler(boxoffice.sell));
+router.get('/events/:id/box-office/report', asyncHandler(boxoffice.report));
 
 // Cardápio do bar (Zig) — módulo cashless
 router.get('/events/:id/menu-items', asyncHandler(menu.menuList));
