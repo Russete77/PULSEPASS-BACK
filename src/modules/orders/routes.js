@@ -13,6 +13,7 @@ router.post('/', asyncHandler(ctrl.create));
 router.get('/', asyncHandler(ctrl.listMine));
 router.get('/:id', asyncHandler(ctrl.getById));
 router.post('/:id/refund', asyncHandler(ctrl.refund));
+router.post('/:id/resend-tickets', asyncHandler(ctrl.resend));
 
 // Simulação de pagamento — apenas fora de produção
 if (!env.isProd) {

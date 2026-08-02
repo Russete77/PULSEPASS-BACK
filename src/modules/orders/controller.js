@@ -65,3 +65,7 @@ export async function simulatePaid(req, res) {
   const result = await service.markOrderPaidByPaymentId(order.asaas_payment_id);
   res.json({ data: result });
 }
+
+export async function resend(req, res) {
+  res.json({ data: await service.resendTickets({ user: req.user, orderId: req.params.id }) });
+}

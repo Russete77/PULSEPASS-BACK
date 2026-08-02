@@ -4,7 +4,7 @@ import { notFound, badRequest, conflict, ApiError } from '../../utils/ApiError.j
 import { externalRef } from '../../utils/codes.js';
 import { env } from '../../config/env.js';
 import * as asaas from '../payments/provider.js';
-import { deliverTickets } from '../notifications/service.js';
+import { deliverTickets, deliveriesForOrder } from '../notifications/service.js';
 import { logger } from '../../lib/logger.js';
 import * as repo from './repo.js';
 
@@ -198,14 +198,34 @@ export async function markOrderPaidByPaymentId(asaasPaymentId, paidValueCents = 
 /** Busca dados do pedido pago e envia os ingressos ao comprador. */
 async function deliverForOrder(orderId) {
   const { data: order } = await repo.findOrderForDelivery(orderId);
-  if (!order) return;
+  if (!order) return { sent: false, reason: 'order_not_found' };
   const { data: tickets } = await repo.findTicketsForDelivery(orderId);
-  if (!tickets?.length) return;
-  await deliverTickets({
+  if (!tickets?.length) return { sent: false, reason: 'no_tickets' };
+  return deliverTickets({
     to: order.profiles?.email,
     event: { title: order.events?.title },
     tickets,
+    orderId,
   });
+}
+
+/**
+ * Reenvia os ingressos de um pedido pago. É o que o suporte aciona quando o
+ * cliente diz "não recebi" — sem isso a única saída era mexer no banco na mão.
+ * Só o dono do pedido reenvia, e só para o próprio e-mail.
+ */
+export async function resendTickets({ user, orderId }) {
+  const { data: order } = await repo.findOrderForDelivery(orderId);
+  if (!order) throw notFound('Pedido não encontrado');
+  if (order.buyer_id !== user.id) throw notFound('Pedido não encontrado');
+  if (order.status !== 'paid') throw badRequest('Só pedidos pagos têm ingressos para enviar');
+
+  const result = await deliverForOrder(orderId);
+  return {
+    sent: result.sent,
+    reason: result.reason ?? null,
+    history: await deliveriesForOrder(orderId),
+  };
 }
 
 /** Reembolso de pedido pago (iniciado pelo comprador). */

@@ -369,6 +369,8 @@ paths:
     patch: { tags: [admin], summary: Confirmar/recusar reserva, parameters: [{ name: reservationId, in: path, required: true, schema: { type: string, format: uuid } }], responses: { "200": { description: reserva } } }
   /admin/events/{id}/cashier:
     get: { tags: [admin], summary: Fechamento de caixa (por operador), parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }], responses: { "200": { description: fechamento } } }
+  /orders/{id}/resend-tickets:
+    post: { tags: [orders], summary: Reenvia os ingressos por e-mail (pedido pago), parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }], responses: { "200": { description: resultado do envio e historico de tentativas } } }
   /admin/events/{id}/box-office:
     get: { tags: [admin], summary: Abre a bilheteria (lotes a venda + caixa), parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }], responses: { "200": { description: lotes e resumo do caixa } } }
   /admin/events/{id}/box-office/sales:

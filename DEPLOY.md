@@ -15,6 +15,12 @@ Config padrão aqui é **Fly.io** (`fly.toml`), região São Paulo (`gru`).
 | `TICKET_QR_SECRET` | segredo forte (≥16 chars) — assina o QR rotativo |
 | `ADMIN_EMAILS` | e-mails do super-admin PulseADM, separados por vírgula |
 | `CORS_ORIGIN` | domínios dos fronts (ex: `https://app.pulsepass.com,https://cockpit.pulsepass.com`) |
+| `RESEND_API_KEY` | painel Resend → API Keys. **Sem ela o cliente não recebe o ingresso por e-mail** |
+| `EMAIL_FROM` | remetente verificado no Resend (ex: `ingressos@pulsepass.com`) |
+
+> Sem `RESEND_API_KEY` + `EMAIL_FROM` a entrega fica desligada — mas não falha
+> calada: cada pedido registra a tentativa como `skipped` em `email_deliveries`.
+> Quando a configuração entrar, `POST /orders/{id}/resend-tickets` reenvia.
 
 ## Banco (uma vez, e a cada nova migration)
 

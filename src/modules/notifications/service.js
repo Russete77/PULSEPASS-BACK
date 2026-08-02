@@ -1,5 +1,6 @@
 import { env } from '../../config/env.js';
 import { logger } from '../../lib/logger.js';
+import * as repo from './repo.js';
 
 // ─────────────────────────────────────────────────────────────
 // Entrega de ingresso por e-mail (QR + PDF). Tudo OPCIONAL e gated:
@@ -53,10 +54,23 @@ async function buildPdf({ event, tickets, qrMap }) {
   });
 }
 
-/** Envia o e-mail com os ingressos. to = e-mail do comprador. */
-export async function deliverTickets({ to, event, tickets }) {
-  if (!deliveryEnabled) { logger.info('entrega: desativada (sem RESEND_API_KEY/EMAIL_FROM)'); return { sent: false }; }
-  if (!to || !tickets?.length) return { sent: false };
+/**
+ * Envia o e-mail com os ingressos e REGISTRA o resultado.
+ *
+ * O registro é o ponto: antes, uma falha virava um logger.warn e sumia — o
+ * cliente não recebia o ingresso e ninguém ficava sabendo até a fila do evento.
+ * Agora toda tentativa (enviada, falha ou pulada) fica em email_deliveries,
+ * então dá pra ver o que quebrou e reenviar.
+ */
+export async function deliverTickets({ to, event, tickets, orderId = null }) {
+  if (!deliveryEnabled) {
+    // "Pulado" também é registro: a produtora precisa enxergar que o e-mail
+    // não saiu por falta de configuração, em vez de supor que saiu.
+    logger.info('entrega: desativada (sem RESEND_API_KEY/EMAIL_FROM)');
+    await record({ orderId, to, status: 'skipped', error: 'RESEND_API_KEY/EMAIL_FROM ausentes' });
+    return { sent: false, reason: 'not_configured' };
+  }
+  if (!to || !tickets?.length) return { sent: false, reason: 'nothing_to_send' };
 
   // QR de cada ingresso
   const qrMap = {};
@@ -87,17 +101,51 @@ export async function deliverTickets({ to, event, tickets }) {
     ...(pdf ? { attachments: [{ filename: 'ingressos.pdf', content: pdf.toString('base64') }] } : {}),
   };
 
-  try {
-    const res = await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${env.email.resendApiKey}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    });
-    if (!res.ok) { logger.warn('entrega: falha no envio', { status: res.status }); return { sent: false }; }
-    logger.info('entrega: ingressos enviados', { to, count: tickets.length });
-    return { sent: true };
-  } catch (err) {
-    logger.warn('entrega: erro de rede no envio', { error: err.message });
-    return { sent: false };
+  // Até 3 tentativas com espera crescente: instabilidade momentânea do
+  // provedor não pode custar o ingresso do cliente.
+  let ultimoErro = null;
+  for (let tentativa = 1; tentativa <= 3; tentativa++) {
+    try {
+      const res = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${env.email.resendApiKey}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      if (res.ok) {
+        const json = await res.json().catch(() => ({}));
+        logger.info('entrega: ingressos enviados', { to, count: tickets.length, tentativa });
+        await record({ orderId, to, status: 'sent', attempts: tentativa, providerId: json?.id ?? null });
+        return { sent: true, attempts: tentativa };
+      }
+      const corpo = await res.text().catch(() => '');
+      ultimoErro = `HTTP ${res.status} ${corpo.slice(0, 180)}`;
+      // 4xx (chave inválida, remetente não verificado) não melhora com retry.
+      if (res.status >= 400 && res.status < 500 && res.status !== 429) break;
+    } catch (err) {
+      ultimoErro = err.message;
+    }
+    if (tentativa < 3) await new Promise((r) => setTimeout(r, 400 * tentativa));
   }
+
+  logger.warn('entrega: falha no envio', { to, error: ultimoErro });
+  await record({ orderId, to, status: 'failed', attempts: 3, error: ultimoErro });
+  return { sent: false, reason: 'delivery_failed', error: ultimoErro };
+}
+
+/** Grava a tentativa. Nunca lança: registrar não pode derrubar uma venda paga. */
+async function record({ orderId, to, status, attempts = 1, error = null, providerId = null }) {
+  try {
+    await repo.insertDelivery({
+      order_id: orderId, to_email: to, kind: 'tickets',
+      status, attempts, error: error ? String(error).slice(0, 500) : null, provider_id: providerId,
+    });
+  } catch (e) {
+    logger.warn('entrega: não foi possível registrar a tentativa', { error: e.message });
+  }
+}
+
+/** Entregas de um pedido — o suporte usa pra responder "não recebi meu ingresso". */
+export async function deliveriesForOrder(orderId) {
+  const { data } = await repo.findDeliveriesByOrder(orderId);
+  return data ?? [];
 }

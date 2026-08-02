@@ -96,7 +96,7 @@ export async function sell({
   //    derruba a venda — o dinheiro já entrou e o ingresso já existe.
   if (email && tickets?.length) {
     try {
-      await deliverTickets({ to: email, event, tickets });
+      await deliverTickets({ to: email, event, tickets, orderId: row.order_id });
     } catch (e) {
       logger.warn('bilheteria: falha ao enviar ingressos por e-mail', { error: e.message, orderId: row.order_id });
     }

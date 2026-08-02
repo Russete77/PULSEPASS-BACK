@@ -48,7 +48,8 @@ export const rpcConfirmOrderPayment = (paymentId) =>
 
 export const findOrderForDelivery = (orderId) =>
   supabase.from('orders')
-    .select('id, buyer_id, event_id, events(title), profiles:buyer_id(email)')
+    // status entra aqui porque o reenvio manual só vale para pedido pago.
+    .select('id, buyer_id, status, event_id, events(title), profiles:buyer_id(email)')
     .eq('id', orderId).maybeSingle();
 
 export const findTicketsForDelivery = (orderId) =>
