@@ -13,7 +13,7 @@ const ROLE_BAR = ['bar', 'manager'];
  * Valida e CONSOME um ingresso (uso interno — sem checagem de acesso).
  * Idempotente: o update condicional por status='valid' evita dupla entrada.
  */
-async function consumeTicket(eventId, input, when) {
+async function consumeTicket(eventId, input, when, { operatorId = null, direction = null, gate = null } = {}) {
   if (!input) return { result: 'invalid', message: 'Código vazio' };
 
   const raw = String(input).trim();
@@ -41,24 +41,42 @@ async function consumeTicket(eventId, input, when) {
     return { result: 'invalid', message: 'QR inválido' };
   }
   if (ticket.event_id !== eventId) return { result: 'wrong_event', message: 'Ingresso de outro evento' };
-  if (ticket.status === 'used')
-    return { result: 'already_used', message: 'Ingresso já utilizado',
-             checked_in_at: ticket.checked_in_at, holder: ticket.profiles?.full_name, tier: ticket.ticket_tiers?.name };
-  if (ticket.status !== 'valid') return { result: 'invalid', message: `Ingresso ${ticket.status}` };
 
-  const now = when || new Date().toISOString();
-  const { data: updated, error: uErr } = await repo.consumeTicketRow(ticket.id, now);
-  if (uErr) throw uErr;
-  if (!updated) return { result: 'already_used', message: 'Ingresso já utilizado' };
+  // A passagem é decidida no banco (gate_pass), numa transação só: registra o
+  // movimento, aplica a política de reentrada do evento e devolve o veredito.
+  // Fazer isso aqui em JS abriria corrida entre dois porteiros escaneando o
+  // mesmo ingresso ao mesmo tempo em portões diferentes.
+  const { data: verdict, error: gErr } = await repo.rpcGatePass({
+    ticketId: ticket.id, eventId, operatorId, direction, gate,
+  });
+  if (gErr) throw gErr;
 
-  return { result: 'ok', message: 'Entrada liberada', code: ticket.code,
-           holder: ticket.profiles?.full_name, tier: ticket.ticket_tiers?.name, checked_in_at: now };
+  // Enriquece com o que a tela da porta mostra (nome e setor).
+  return {
+    ...verdict,
+    code: ticket.code,
+    holder: ticket.profiles?.full_name ?? null,
+    tier: ticket.ticket_tiers?.name ?? null,
+    checked_in_at: verdict.result === 'ok' ? (when || new Date().toISOString()) : ticket.checked_in_at,
+  };
 }
 
-/** Check-in na porta. Aceita código (PP-XXXX-XXXX) ou payload PULSEPASS:<id>:<secret>. */
-export async function checkIn({ user, eventId, input }) {
+/**
+ * Passagem na porta. Aceita QR rotativo, payload PULSEPASS: ou código curto.
+ * `direction` é opcional: sem ela a porta alterna (quem está fora entra, quem
+ * está dentro sai), que é como o porteiro trabalha sem apertar botão nenhum.
+ */
+export async function checkIn({ user, eventId, input, direction = null, gate = null }) {
   await assertEventAccess(user.id, eventId, ROLE_DOOR);
-  return consumeTicket(eventId, input);
+  return consumeTicket(eventId, input, null, { operatorId: user.id, direction, gate });
+}
+
+/** Lotação em tempo real: quantos estão dentro agora. */
+export async function occupancy({ user, eventId }) {
+  await assertEventAccess(user.id, eventId, ROLE_DOOR);
+  const { data, error } = await repo.rpcOccupancy(eventId);
+  if (error) throw error;
+  return data ?? {};
 }
 
 /** MODO OFFLINE — manifesto do evento (todos os ingressos p/ validação local). */
@@ -85,7 +103,9 @@ export async function checkInBatch({ user, eventId, scans }) {
   const results = [];
   for (const s of scans) {
     try {
-      const r = await consumeTicket(eventId, s.input, s.scanned_at);
+      // Fila offline sempre representa ENTRADA: o porteiro escaneou na porta.
+      const r = await consumeTicket(eventId, s.input, s.scanned_at,
+        { operatorId: user.id, direction: 'in' });
       results.push({ client_id: s.client_id ?? null, ...r });
     } catch (err) {
       results.push({ client_id: s.client_id ?? null, result: 'error', message: err.message });

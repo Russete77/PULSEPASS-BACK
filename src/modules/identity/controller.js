@@ -25,6 +25,10 @@ const eventSchema = z.object({
   starts_at: z.string().min(1),
   ends_at: z.string().optional(),
   service_fee_bps: z.number().int().min(0).max(10000).optional(), // taxa de serviço (bps)
+  // Reentrada: desligada por padrão. Ligar sem a casa pedir é convite a
+  // ingresso emprestado (um entra, sai e passa o celular pro amigo).
+  reentry_enabled: z.boolean().optional(),
+  reentry_max: z.number().int().min(1).max(20).nullable().optional(),
   tiers: z.array(z.object({
     name: z.string().min(1),
     price_cents: z.number().int().nonnegative(),

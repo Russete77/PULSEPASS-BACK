@@ -14,6 +14,25 @@ export function findTicketForCheckin({ id, secret, code }) {
 export const findTicketById = (id) =>
   supabase.from('tickets').select(CHECKIN_COLS).eq('id', id).maybeSingle();
 
+/**
+ * Passagem na porta: registra o movimento e aplica a política de reentrada do
+ * evento numa transação só. Decidir isso em JS abriria corrida entre dois
+ * porteiros escaneando o mesmo ingresso em portões diferentes.
+ */
+export const rpcGatePass = ({ ticketId, eventId, operatorId, direction, gate }) =>
+  supabase.rpc('gate_pass', {
+    p_ticket: ticketId, p_event: eventId, p_operator: operatorId ?? null,
+    p_direction: direction ?? null, p_gate: gate ?? null,
+  });
+
+/** Quantos estão DENTRO agora — o que segurança e bombeiro perguntam. */
+export const rpcOccupancy = (eventId) => supabase.rpc('event_occupancy', { p_event: eventId });
+
+export const findTicketMovements = (ticketId) =>
+  supabase.from('gate_movements')
+    .select('direction, gate, created_at')
+    .eq('ticket_id', ticketId).order('created_at', { ascending: false }).limit(20);
+
 /** Consome o ingresso de forma idempotente (só muda se status='valid'). */
 export const consumeTicketRow = (ticketId, when) =>
   supabase.from('tickets')

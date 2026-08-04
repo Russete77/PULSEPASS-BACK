@@ -35,6 +35,7 @@ router.delete('/events/:id/staff/:staffId', asyncHandler(ctrl.removeStaff));
 // Operação (porta / bar / PDV) — módulo door
 router.post('/events/:id/checkin', asyncHandler(ops.checkIn));
 router.get('/events/:id/manifest', asyncHandler(ops.manifest));
+router.get('/events/:id/occupancy', asyncHandler(ops.occupancy));
 router.post('/events/:id/checkin-batch', asyncHandler(ops.checkInBatch));
 router.get('/events/:id/menu', asyncHandler(ops.menu));
 router.get('/events/:id/wallet-lookup', asyncHandler(ops.walletLookup));

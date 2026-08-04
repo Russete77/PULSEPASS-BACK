@@ -371,6 +371,8 @@ paths:
     get: { tags: [admin], summary: Fechamento de caixa (por operador), parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }], responses: { "200": { description: fechamento } } }
   /orders/{id}/resend-tickets:
     post: { tags: [orders], summary: Reenvia os ingressos por e-mail (pedido pago), parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }], responses: { "200": { description: resultado do envio e historico de tentativas } } }
+  /admin/events/{id}/occupancy:
+    get: { tags: [admin], summary: Lotacao em tempo real (quantos estao dentro), parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }], responses: { "200": { description: lotacao } } }
   /admin/events/{id}/fiscal:
     get: { tags: [admin], summary: Documentos fiscais do evento (NFS-e) e resumo, parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }], responses: { "200": { description: notas e resumo } } }
   /admin/events/{id}/fiscal/issue:

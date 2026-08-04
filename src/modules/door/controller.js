@@ -3,11 +3,23 @@ import { z } from 'zod';
 import * as service from './service.js';
 import { badRequest } from '../../utils/ApiError.js';
 
-const checkinSchema = z.object({ input: z.string().min(1) });
+const checkinSchema = z.object({
+  input: z.string().min(1),
+  // Sem direction a porta alterna sozinha (fora→entra, dentro→sai).
+  direction: z.enum(['in', 'out']).optional(),
+  gate: z.string().max(40).optional(),
+});
 export async function checkIn(req, res) {
   const p = checkinSchema.safeParse(req.body);
   if (!p.success) throw badRequest('Código inválido', p.error.flatten());
-  res.json({ data: await service.checkIn({ user: req.user, eventId: req.params.id, input: p.data.input }) });
+  res.json({ data: await service.checkIn({
+    user: req.user, eventId: req.params.id,
+    input: p.data.input, direction: p.data.direction ?? null, gate: p.data.gate ?? null,
+  }) });
+}
+
+export async function occupancy(req, res) {
+  res.json({ data: await service.occupancy({ user: req.user, eventId: req.params.id }) });
 }
 
 export async function manifest(req, res) {
