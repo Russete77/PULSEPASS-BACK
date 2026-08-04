@@ -11,6 +11,7 @@ import * as coupons from '../coupons/controller.js';
 import * as menu from '../cashless/controller.js';
 import * as tables from '../tables/controller.js';
 import * as boxoffice from '../boxoffice/controller.js';
+import * as fiscal from '../fiscal/controller.js';
 
 const router = Router();
 router.use(requireAuth);
@@ -43,6 +44,10 @@ router.post('/events/:id/pdv-charge', asyncHandler(ops.pdvCharge));
 router.get('/events/:id/box-office', asyncHandler(boxoffice.open));
 router.post('/events/:id/box-office/sales', asyncHandler(boxoffice.sell));
 router.get('/events/:id/box-office/report', asyncHandler(boxoffice.report));
+
+// Fiscal (NFS-e) — módulo fiscal
+router.get('/events/:id/fiscal', asyncHandler(fiscal.list));
+router.post('/events/:id/fiscal/issue', asyncHandler(fiscal.issue));
 
 // Cardápio do bar (Zig) — módulo cashless
 router.get('/events/:id/menu-items', asyncHandler(menu.menuList));

@@ -22,6 +22,21 @@ Config padrão aqui é **Fly.io** (`fly.toml`), região São Paulo (`gru`).
 > calada: cada pedido registra a tentativa como `skipped` em `email_deliveries`.
 > Quando a configuração entrar, `POST /orders/{id}/resend-tickets` reenvia.
 
+### Fiscal (NFS-e) — opcional, mas obrigatório para faturar
+
+| Variável | Origem |
+|---|---|
+| `FISCAL_PROVIDER` | `mock` (padrão) ou `focusnfe` |
+| `FISCAL_API_TOKEN` | token do emissor. **Vazio = modo mock: nada é enviado à prefeitura** |
+| `FISCAL_BASE_URL` | endpoint do emissor (padrão: Focus NFe) |
+| `FISCAL_SERVICE_CODE` | código do serviço na sua prefeitura (o contador informa) |
+| `FISCAL_AUTO_ISSUE` | `true` emite a nota ao confirmar o pagamento. **Padrão `false`** |
+
+> `FISCAL_AUTO_ISSUE` nasce desligado de propósito: emitir nota é ato com efeito
+> legal e a casa precisa pedir explicitamente. Com ele desligado, a emissão é
+> manual pelo cockpit (`POST /admin/events/{id}/fiscal/issue`).
+> O reembolso de um pedido cancela a NFS-e correspondente automaticamente.
+
 ## Banco (uma vez, e a cada nova migration)
 
 ```bash

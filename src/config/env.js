@@ -54,6 +54,18 @@ export const env = {
     resendApiKey: process.env.RESEND_API_KEY ?? '',
     from: process.env.EMAIL_FROM ?? '',
   },
+
+  // Fiscal (NFS-e). Sem credencial o provedor roda em MOCK: a nota é registrada
+  // com número simulado, o fluxo inteiro fica testável e NADA é enviado à
+  // prefeitura. Em produção sem credencial a nota fica 'pending' — o sistema
+  // nunca finge que emitiu um documento fiscal.
+  fiscal: {
+    provider: process.env.FISCAL_PROVIDER ?? 'mock',    // mock | focusnfe
+    apiToken: process.env.FISCAL_API_TOKEN ?? '',
+    baseUrl: process.env.FISCAL_BASE_URL ?? 'https://api.focusnfe.com.br',
+    serviceCode: process.env.FISCAL_SERVICE_CODE ?? '', // código municipal do serviço
+    autoIssue: (process.env.FISCAL_AUTO_ISSUE ?? 'false') === 'true',
+  },
 };
 
 // Guard de produção: sem ASAAS_WEBHOOK_TOKEN o webhook seria fail-open

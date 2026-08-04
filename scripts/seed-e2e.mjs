@@ -62,7 +62,10 @@ async function main() {
   const { data: ev } = await db.from('events').insert({
     organization_id: org.id, title: 'Festa E2E', slug: SLUG,
     description: 'Evento de teste ponta a ponta.', venue_name: 'Arena Teste', address: 'Rua 1',
-    city: 'São Paulo', state: 'SP', starts_at: iso(now + 2 * 864e5), status: 'published', service_fee_bps: 1000,
+    // 60 dias à frente: a vitrine só lista evento futuro, e uma fixture que
+    // vence no meio do desenvolvimento faz o teste falhar por idade do dado,
+    // não por defeito no código.
+    city: 'São Paulo', state: 'SP', starts_at: iso(now + 60 * 864e5), status: 'published', service_fee_bps: 1000,
   }).select('id').single();
 
   console.log('lotes (inteira/meia)…');

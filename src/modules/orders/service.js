@@ -5,6 +5,7 @@ import { externalRef } from '../../utils/codes.js';
 import { env } from '../../config/env.js';
 import * as asaas from '../payments/provider.js';
 import { deliverTickets, deliveriesForOrder } from '../notifications/service.js';
+import { issueForOrder, cancelForOrder as cancelFiscalForOrder } from '../fiscal/service.js';
 import { logger } from '../../lib/logger.js';
 import * as repo from './repo.js';
 
@@ -191,6 +192,13 @@ export async function markOrderPaidByPaymentId(asaasPaymentId, paidValueCents = 
   // Entrega os ingressos por e-mail só na PRIMEIRA confirmação (idempotente).
   if (data?.found && !data.alreadyProcessed && data.orderId) {
     deliverForOrder(data.orderId).catch((e) => logger.warn('entrega: falhou', { error: e.message }));
+
+    // Nota fiscal: só quando a produtora liga FISCAL_AUTO_ISSUE. Emitir nota é
+    // ato com efeito legal — não pode ser ligado por padrão sem a casa pedir.
+    // Falha aqui não desfaz o pagamento: fica registrada e é reemitida depois.
+    if (env.fiscal.autoIssue) {
+      issueForOrder(data.orderId).catch((e) => logger.warn('fiscal: emissão automática falhou', { error: e.message }));
+    }
   }
   return data;
 }
@@ -242,5 +250,11 @@ export async function refundOrder({ user, orderId }) {
   }
   const { data, error } = await repo.rpcRefundOrder(orderId);
   if (error) throw error;
+
+  // Dinheiro devolvido, nota cancelada. Deixar NFS-e ativa sobre venda
+  // estornada é o tipo de inconsistência que aparece na apuração do mês.
+  cancelFiscalForOrder(orderId, 'Pedido reembolsado')
+    .catch((e) => logger.warn('fiscal: cancelamento falhou', { orderId, error: e.message }));
+
   return data;
 }
