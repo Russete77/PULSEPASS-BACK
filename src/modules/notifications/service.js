@@ -133,7 +133,7 @@ export async function deliverTickets({ to, event, tickets, orderId = null }) {
 }
 
 /** Grava a tentativa. Nunca lança: registrar não pode derrubar uma venda paga. */
-async function record({ orderId, to, status, attempts = 1, error = null, providerId = null }) {
+async function record({ orderId = null, to, status, attempts = 1, error = null, providerId = null }) {
   try {
     await repo.insertDelivery({
       order_id: orderId, to_email: to, kind: 'tickets',
@@ -148,4 +148,42 @@ async function record({ orderId, to, status, attempts = 1, error = null, provide
 export async function deliveriesForOrder(orderId) {
   const { data } = await repo.findDeliveriesByOrder(orderId);
   return data ?? [];
+}
+
+/**
+ * Avisa quem estava na fila de espera que abriu vaga.
+ * O prazo vai no corpo do e-mail de propósito: sem ele o cliente supõe que a
+ * vaga é dele para sempre, demora, e a próxima pessoa da fila nunca é chamada.
+ */
+export async function notifyWaitlistInvite({ to, name, quantity = 1, ttlMinutes = 60 }) {
+  if (!deliveryEnabled) {
+    await record({ to, status: 'skipped', error: 'RESEND_API_KEY/EMAIL_FROM ausentes' });
+    return { sent: false, reason: 'not_configured' };
+  }
+
+  const html = `
+    <div style="font-family:sans-serif;max-width:480px;margin:auto">
+      <h2>Abriu vaga${name ? `, ${name}` : ''}!</h2>
+      <p>Liberamos ${quantity} ingresso(s) que você estava esperando.</p>
+      <p><strong>Você tem ${ttlMinutes} minutos</strong> para concluir a compra —
+         depois disso a vaga vai para a próxima pessoa da fila.</p>
+      <p style="color:#999;font-size:12px">PulsePass</p>
+    </div>`;
+
+  try {
+    const res = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${env.email.resendApiKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ from: env.email.from, to: [to], subject: 'Abriu vaga para o evento', html }),
+    });
+    if (!res.ok) {
+      await record({ to, status: 'failed', error: `HTTP ${res.status}` });
+      return { sent: false };
+    }
+    await record({ to, status: 'sent' });
+    return { sent: true };
+  } catch (err) {
+    await record({ to, status: 'failed', error: err.message });
+    return { sent: false };
+  }
 }

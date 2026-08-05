@@ -13,6 +13,7 @@ import * as tables from '../tables/controller.js';
 import * as boxoffice from '../boxoffice/controller.js';
 import * as fiscal from '../fiscal/controller.js';
 import * as auditCtrl from '../audit/controller.js';
+import * as waitlistCtrl from '../waitlist/controller.js';
 
 const router = Router();
 router.use(requireAuth);
@@ -50,6 +51,7 @@ router.get('/events/:id/box-office/report', asyncHandler(boxoffice.report));
 // Fiscal (NFS-e) — módulo fiscal
 // Trilha de auditoria (quem fez o que)
 router.get('/events/:id/audit', asyncHandler(auditCtrl.eventTrail));
+router.get('/events/:id/waitlist', asyncHandler(waitlistCtrl.listForEvent));
 
 router.get('/events/:id/fiscal', asyncHandler(fiscal.list));
 router.post('/events/:id/fiscal/issue', asyncHandler(fiscal.issue));

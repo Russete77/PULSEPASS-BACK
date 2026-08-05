@@ -135,6 +135,8 @@ paths:
       parameters: [{ name: slug, in: path, required: true, schema: { type: string } }]
       responses: { "200": { description: cardápio }, "404": { description: indisponível } }
 
+  /events/{slug}/waitlist:
+    post: { tags: [catalog], security: [], summary: Entrar na fila de espera de um lote esgotado, parameters: [{ name: slug, in: path, required: true, schema: { type: string } }], responses: { "201": { description: posicao na fila }, "409": { description: lote ainda tem ingressos } } }
   /tickets:
     get: { tags: [tickets], summary: Meus ingressos, responses: { "200": { description: lista }, "401": { description: sem auth } } }
   /tickets/{id}:
@@ -377,6 +379,8 @@ paths:
     get: { tags: [admin], summary: Lotacao em tempo real (quantos estao dentro), parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }], responses: { "200": { description: lotacao } } }
   /admin/events/{id}/audit:
     get: { tags: [admin], summary: Trilha de auditoria do evento (quem fez o que), parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }, { name: action, in: query, schema: { type: string } }, { name: money, in: query, schema: { type: string } }], responses: { "200": { description: entradas } } }
+  /admin/events/{id}/waitlist:
+    get: { tags: [admin], summary: Fila de espera do evento (quem aguarda e quem foi convidado), parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }], responses: { "200": { description: fila } } }
   /admin/events/{id}/fiscal:
     get: { tags: [admin], summary: Documentos fiscais do evento (NFS-e) e resumo, parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }], responses: { "200": { description: notas e resumo } } }
   /admin/events/{id}/fiscal/issue:

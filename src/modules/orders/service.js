@@ -6,6 +6,7 @@ import { env } from '../../config/env.js';
 import * as asaas from '../payments/provider.js';
 import { deliverTickets, deliveriesForOrder } from '../notifications/service.js';
 import { issueForOrder, cancelForOrder as cancelFiscalForOrder } from '../fiscal/service.js';
+import { inviteForOrder as inviteWaitlistForOrder } from '../waitlist/service.js';
 import { logger } from '../../lib/logger.js';
 import * as repo from './repo.js';
 
@@ -255,6 +256,11 @@ export async function refundOrder({ user, orderId }) {
   // estornada é o tipo de inconsistência que aparece na apuração do mês.
   cancelFiscalForOrder(orderId, 'Pedido reembolsado')
     .catch((e) => logger.warn('fiscal: cancelamento falhou', { orderId, error: e.message }));
+
+  // O estoque voltou: chama a fila de espera. Sem isso a vaga reabre de
+  // madrugada, ninguém vê, e o ingresso morre encalhado.
+  inviteWaitlistForOrder(orderId)
+    .catch((e) => logger.warn('fila: convite após reembolso falhou', { orderId, error: e.message }));
 
   return data;
 }
