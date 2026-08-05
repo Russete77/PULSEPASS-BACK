@@ -13,11 +13,19 @@ const signupSchema = z.object({
   name: z.string().min(2),
   email: z.string().email().optional().or(z.literal('')),
   phone: z.string().optional(),
+  // "João +2": o convite vale para o grupo todo, não só pra quem se inscreveu.
+  party_size: z.number().int().min(1).max(20).optional(),
 });
 export async function signup(req, res) {
   const p = signupSchema.safeParse(req.body);
   if (!p.success) throw badRequest('Dados inválidos', p.error.flatten());
-  res.status(201).json({ data: await service.signup({ code: req.params.code, ...p.data }) });
+  res.status(201).json({
+    data: await service.signup({
+      code: req.params.code,
+      name: p.data.name, email: p.data.email, phone: p.data.phone,
+      partySize: p.data.party_size ?? 1,
+    }),
+  });
 }
 
 /** Beacon de clique no link (público). */
@@ -67,11 +75,21 @@ export async function eventGuests(req, res) {
   res.json({ data: await service.listEventGuests({ user: req.user, eventId: req.params.id }) });
 }
 
+const checkinSchema = z.object({
+  // Quantas pessoas do convite estão entrando AGORA (o grupo raramente chega junto).
+  people: z.number().int().min(1).max(20).optional(),
+});
 export async function checkInGuest(req, res) {
-  res.json({ data: await service.checkInGuest({ user: req.user, guestId: req.params.guestId }) });
+  const p = checkinSchema.safeParse(req.body ?? {});
+  if (!p.success) throw badRequest('Payload inválido', p.error.flatten());
+  res.json({ data: await service.checkInGuest({ user: req.user, guestId: req.params.guestId, people: p.data.people ?? 1 }) });
 }
 
 export async function commissionPaid(req, res) {
   const paid = req.body?.paid !== false;
   res.json({ data: await service.setCommissionPaid({ user: req.user, promoterId: req.params.promoterId, paid }) });
+}
+
+export async function guestlistSummary(req, res) {
+  res.json({ data: await service.guestlistSummary({ user: req.user, eventId: req.params.id }) });
 }

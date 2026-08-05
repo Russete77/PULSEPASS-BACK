@@ -1,5 +1,5 @@
 // modules/guestlist/service.js — regra do domínio Guest list / promoters.
-import { notFound, badRequest } from '../../utils/ApiError.js';
+import { notFound, badRequest, conflict } from '../../utils/ApiError.js';
 import { assertEventAccess } from '../identity/access.js';
 import * as repo from './repo.js';
 
@@ -31,7 +31,7 @@ export async function registerHit(code) {
   return { ok: true };
 }
 
-export async function signup({ code, name, email, phone }) {
+export async function signup({ code, name, email, phone, partySize = 1 }) {
   if (!name || name.trim().length < 2) throw badRequest('Informe seu nome');
   const { data: promoter } = await repo.findPromoterByCode(code);
   if (!promoter) throw notFound('Lista não encontrada');
@@ -39,9 +39,10 @@ export async function signup({ code, name, email, phone }) {
   const { data, error } = await repo.insertGuest({
     promoter_id: promoter.id, event_id: promoter.event_id,
     name: name.trim(), email: email?.trim() || null, phone: phone?.trim() || null, status: 'confirmed',
+    party_size: Math.max(1, Math.min(20, Number(partySize) || 1)),
   });
   if (error) throw error;
-  return { id: data.id, name: data.name, status: data.status };
+  return { id: data.id, name: data.name, status: data.status, party_size: data.party_size };
 }
 
 /* ADMIN */
@@ -120,18 +121,37 @@ export async function listEventGuests({ user, eventId }) {
   return (data ?? []).map((g) => ({
     id: g.id, name: g.name, email: g.email, phone: g.phone,
     status: g.status, checked_in_at: g.checked_in_at, promoter: g.promoters?.name ?? null,
+    // O porteiro precisa ver o grupo, não só a linha: "João +2, entraram 1".
+    party_size: g.party_size ?? 1, checked_in_count: g.checked_in_count ?? 0,
   }));
 }
 
-export async function checkInGuest({ user, guestId }) {
+/**
+ * Check-in de convidado, com acompanhantes.
+ * `people` é quantas pessoas do convite estão entrando AGORA — o grupo
+ * raramente chega junto, então chegada parcial é o caso comum, não exceção.
+ */
+export async function checkInGuest({ user, guestId, people = 1 }) {
   const { data: guest } = await repo.findGuestForCheckin(guestId);
   if (!guest) throw notFound('Convidado não encontrado');
   // Porteiro (door) ou manager podem dar check-in — não só o dono.
   await assertEventAccess(user.id, guest.event_id, ['door', 'manager']);
-  if (guest.status === 'checked_in') return { already: true };
-  const { error } = await repo.updateGuestCheckedIn(guestId);
+
+  const { data, error } = await repo.rpcGuestCheckIn(guestId, people);
+  if (error) {
+    if (String(error.message).includes('GUEST_CANCELLED')) throw conflict('Convite cancelado');
+    if (String(error.message).includes('INVALID_PEOPLE')) throw badRequest('Quantidade inválida');
+    throw error;
+  }
+  return data;
+}
+
+/** Resumo da lista em PESSOAS (não linhas) — é assim que a casa conta lotação. */
+export async function guestlistSummary({ user, eventId }) {
+  await assertEventAccess(user.id, eventId, ['door', 'manager']);
+  const { data, error } = await repo.rpcGuestlistSummary(eventId);
   if (error) throw error;
-  return { ok: true };
+  return data ?? {};
 }
 
 /** Marca (ou desmarca) a comissão de um promoter como paga. */

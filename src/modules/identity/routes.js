@@ -75,6 +75,7 @@ router.delete('/coupons/:couponId', asyncHandler(coupons.remove));
 router.post('/events/:id/promoters', asyncHandler(promoters.create));
 router.get('/events/:id/promoters', asyncHandler(promoters.list));
 router.get('/events/:id/guests', asyncHandler(promoters.eventGuests));
+router.get('/events/:id/guests/summary', asyncHandler(promoters.guestlistSummary));
 router.get('/promoters/:promoterId/guests', asyncHandler(promoters.guests));
 router.post('/promoters/:promoterId/commission-paid', asyncHandler(promoters.commissionPaid));
 router.post('/guests/:guestId/checkin', asyncHandler(promoters.checkInGuest));
