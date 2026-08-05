@@ -3,6 +3,7 @@ import { z } from 'zod';
 import * as service from './service.js';
 import { supabase } from '../../config/supabase.js';
 import { badRequest } from '../../utils/ApiError.js';
+import * as audit from '../audit/service.js';
 
 const createSchema = z.object({
   eventSlug: z.string().min(1),
@@ -56,7 +57,13 @@ export async function getById(req, res) {
 }
 
 export async function refund(req, res) {
-  res.json({ data: await service.refundOrder({ user: req.user, orderId: req.params.id }) });
+  const data = await service.refundOrder({ user: req.user, orderId: req.params.id });
+  // Dinheiro SAINDO: o registro mais consultado numa auditoria.
+  await audit.record({
+    req, action: 'order.refund', entity: 'orders', entityId: req.params.id,
+    amountCents: data?.refunded_cents ?? null, after: data,
+  });
+  res.json({ data });
 }
 
 /** DEV ONLY — simula a confirmação do pagamento sem depender do webhook. */

@@ -17,6 +17,9 @@ export const setProfileRole = (userId, role) =>
 export const findOrgOwned = (orgId, userId) =>
   supabase.from('organizations').select('id').eq('id', orgId).eq('owner_id', userId).maybeSingle();
 
+export const findOrgWallet = (orgId) =>
+  supabase.from('organizations').select('id, name, asaas_wallet_id').eq('id', orgId).maybeSingle();
+
 export const updateOrgWallet = (orgId, walletId) =>
   supabase.from('organizations').update({ asaas_wallet_id: walletId })
     .eq('id', orgId).select('id, name, asaas_wallet_id').single();

@@ -375,6 +375,8 @@ paths:
     get: { tags: [admin], summary: Resumo da lista em PESSOAS (esperadas x chegadas), parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }], responses: { "200": { description: resumo } } }
   /admin/events/{id}/occupancy:
     get: { tags: [admin], summary: Lotacao em tempo real (quantos estao dentro), parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }], responses: { "200": { description: lotacao } } }
+  /admin/events/{id}/audit:
+    get: { tags: [admin], summary: Trilha de auditoria do evento (quem fez o que), parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }, { name: action, in: query, schema: { type: string } }, { name: money, in: query, schema: { type: string } }], responses: { "200": { description: entradas } } }
   /admin/events/{id}/fiscal:
     get: { tags: [admin], summary: Documentos fiscais do evento (NFS-e) e resumo, parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }], responses: { "200": { description: notas e resumo } } }
   /admin/events/{id}/fiscal/issue:

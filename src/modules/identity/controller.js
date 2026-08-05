@@ -2,6 +2,7 @@
 import { z } from 'zod';
 import * as service from './service.js';
 import { badRequest } from '../../utils/ApiError.js';
+import * as audit from '../audit/service.js';
 
 export async function me(req, res) {
   res.json({ data: await service.getMe({ user: req.user }) });
@@ -56,7 +57,13 @@ const statusSchema = z.object({ status: z.string() });
 export async function setStatus(req, res) {
   const p = statusSchema.safeParse(req.body);
   if (!p.success) throw badRequest('Payload inválido', p.error.flatten());
-  res.json({ data: await service.setEventStatus({ user: req.user, eventId: req.params.id, status: p.data.status }) });
+  const data = await service.setEventStatus({ user: req.user, eventId: req.params.id, status: p.data.status });
+  // Publicar abre as vendas; pausar/cancelar as fecha. Decisao de negocio.
+  await audit.record({
+    req, action: `event.status.${p.data.status}`, entity: 'events', entityId: req.params.id,
+    eventId: req.params.id, after: { status: p.data.status },
+  });
+  res.json({ data });
 }
 
 export async function dashboard(req, res) {
@@ -76,11 +83,22 @@ const staffSchema = z.object({ email: z.string().email(), role: z.enum(['manager
 export async function addStaff(req, res) {
   const p = staffSchema.safeParse(req.body);
   if (!p.success) throw badRequest('Payload inválido', p.error.flatten());
-  res.status(201).json({ data: await service.addEventStaff({ user: req.user, eventId: req.params.id, ...p.data }) });
+  const data = await service.addEventStaff({ user: req.user, eventId: req.params.id, ...p.data });
+  // Quem entra na equipe passa a poder validar entrada e mexer no caixa.
+  await audit.record({
+    req, action: 'staff.add', entity: 'event_staff', entityId: data?.id,
+    eventId: req.params.id, after: { email: p.data.email, role: p.data.role },
+  });
+  res.status(201).json({ data });
 }
 
 export async function removeStaff(req, res) {
-  res.json({ data: await service.removeEventStaff({ user: req.user, eventId: req.params.id, staffId: req.params.staffId }) });
+  const data = await service.removeEventStaff({ user: req.user, eventId: req.params.id, staffId: req.params.staffId });
+  await audit.record({
+    req, action: 'staff.remove', entity: 'event_staff', entityId: req.params.staffId,
+    eventId: req.params.id,
+  });
+  res.json({ data });
 }
 
 // ── Carteira Asaas da produtora (split/repasse) ──
@@ -88,5 +106,18 @@ const walletSchema = z.object({ asaas_wallet_id: z.string().min(1).nullable().op
 export async function setOrgWallet(req, res) {
   const p = walletSchema.safeParse(req.body);
   if (!p.success) throw badRequest('Payload inválido', p.error.flatten());
-  res.json({ data: await service.setOrgAsaasWallet({ user: req.user, orgId: req.params.orgId, asaasWalletId: p.data.asaas_wallet_id }) });
+  const antes = await service.getOrgWallet({ user: req.user, orgId: req.params.orgId });
+  const data = await service.setOrgAsaasWallet({ user: req.user, orgId: req.params.orgId, asaasWalletId: p.data.asaas_wallet_id });
+
+  // Esta é a mudança mais perigosa do sistema: altera PARA ONDE vai o repasse
+  // de todas as vendas. Sem o antes/depois na trilha, um desvio de destino
+  // seria invisível.
+  await audit.record({
+    req, action: 'organization.wallet_change', entity: 'organizations', entityId: req.params.orgId,
+    organizationId: req.params.orgId,
+    before: { asaas_wallet_id: antes?.asaas_wallet_id ?? null },
+    after: { asaas_wallet_id: data?.asaas_wallet_id ?? null },
+  });
+
+  res.json({ data });
 }

@@ -41,6 +41,13 @@ async function assertOrgOwner(userId, orgId) {
   if (!data) throw forbidden('Organização não pertence a você');
 }
 
+/** Carteira atual — lida ANTES da troca para a trilha registrar o "de → para". */
+export async function getOrgWallet({ user, orgId }) {
+  await assertOrgOwner(user.id, orgId);
+  const { data } = await repo.findOrgWallet(orgId);
+  return data ?? null;
+}
+
 /** Configura a carteira Asaas da produtora (destino do repasse/split). */
 export async function setOrgAsaasWallet({ user, orgId, asaasWalletId }) {
   await assertOrgOwner(user.id, orgId);

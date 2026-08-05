@@ -2,6 +2,7 @@
 import { z } from 'zod';
 import { badRequest } from '../../utils/ApiError.js';
 import * as service from './service.js';
+import * as audit from '../audit/service.js';
 
 const sellSchema = z.object({
   items: z.array(z.object({
@@ -31,6 +32,20 @@ export async function sell(req, res) {
     items: p.data.items, method: p.data.method, receivedCents: p.data.received_cents,
     buyer: p.data.buyer ?? {}, note: p.data.note,
   });
+
+  // Dinheiro entrando pela mão de alguém: fica na trilha imutável com o
+  // operador, a forma e o valor. É o registro que sustenta o fechamento.
+  await audit.record({
+    req, action: 'box_office.sale', entity: 'orders', entityId: data.order_id,
+    eventId: req.params.id, amountCents: data.total_cents,
+    after: {
+      method: data.method, received_cents: data.received_cents,
+      change_cents: data.change_cents, tickets: data.tickets.length,
+      bearer: data.bearer, buyer_name: p.data.buyer?.name ?? null,
+    },
+    note: p.data.note ?? null,
+  });
+
   res.status(201).json({ data });
 }
 
