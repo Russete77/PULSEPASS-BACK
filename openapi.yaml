@@ -377,6 +377,14 @@ paths:
     get: { tags: [admin], summary: Resumo da lista em PESSOAS (esperadas x chegadas), parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }], responses: { "200": { description: resumo } } }
   /admin/events/{id}/occupancy:
     get: { tags: [admin], summary: Lotacao em tempo real (quantos estao dentro), parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }], responses: { "200": { description: lotacao } } }
+  /platform/billing:
+    get: { tags: [admin], summary: Taxa da plataforma (padrao + por produtora), responses: { "200": { description: configuracao } } }
+  /platform/billing/default-fee:
+    patch: { tags: [admin], summary: Altera a taxa padrao da plataforma, responses: { "200": { description: alterada } } }
+  /platform/billing/orgs/{orgId}/fee:
+    patch: { tags: [admin], summary: Define a taxa negociada de uma produtora, parameters: [{ name: orgId, in: path, required: true, schema: { type: string, format: uuid } }], responses: { "200": { description: alterada } } }
+  /admin/organizations/{orgId}/repasse:
+    get: { tags: [admin], summary: Transparencia do repasse (como o dinheiro e calculado), parameters: [{ name: orgId, in: path, required: true, schema: { type: string, format: uuid } }], responses: { "200": { description: explicacao e exemplo } } }
   /admin/events/{id}/audit:
     get: { tags: [admin], summary: Trilha de auditoria do evento (quem fez o que), parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }, { name: action, in: query, schema: { type: string } }, { name: money, in: query, schema: { type: string } }], responses: { "200": { description: entradas } } }
   /admin/events/{id}/waitlist:

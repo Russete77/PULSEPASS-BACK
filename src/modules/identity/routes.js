@@ -13,6 +13,7 @@ import * as tables from '../tables/controller.js';
 import * as boxoffice from '../boxoffice/controller.js';
 import * as fiscal from '../fiscal/controller.js';
 import * as auditCtrl from '../audit/controller.js';
+import * as billingCtrl from '../billing/controller.js';
 import * as waitlistCtrl from '../waitlist/controller.js';
 
 const router = Router();
@@ -21,6 +22,8 @@ router.use(requireAuth);
 router.get('/me', asyncHandler(ctrl.me));
 router.post('/organizations', asyncHandler(ctrl.createOrg));
 router.patch('/organizations/:orgId/asaas-wallet', asyncHandler(ctrl.setOrgWallet));
+// Transparencia do repasse: a produtora precisa conseguir conferir a conta.
+router.get('/organizations/:orgId/repasse', asyncHandler(billingCtrl.transparency));
 
 router.get('/events', asyncHandler(ctrl.listEvents));
 router.post('/events', asyncHandler(ctrl.createEvent));

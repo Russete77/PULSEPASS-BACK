@@ -3,8 +3,14 @@ import { supabase } from '../../config/supabase.js';
 
 export const findEventForCheckout = (slug) =>
   supabase.from('events')
-    .select('id, title, status, organizations!inner(asaas_wallet_id)')
+    // fee_bps vem junto: a taxa aplicada é a da produtora (ou o padrão da
+    // plataforma) e precisa ser resolvida ANTES de montar o split.
+    .select('id, title, status, organization_id, organizations!inner(id, asaas_wallet_id, fee_bps)')
     .eq('slug', slug).maybeSingle();
+
+/** Taxa efetiva da produtora: a dela, ou o padrão da plataforma. */
+export const rpcEffectiveFee = (orgId) =>
+  supabase.rpc('effective_fee_bps', { p_org: orgId });
 
 export const rpcPlaceOrder = ({ buyerId, eventId, items, idempotencyKey }) =>
   supabase.rpc('place_order', {
@@ -23,6 +29,10 @@ export const rpcAttachPayment = (args) => supabase.rpc('attach_order_payment', a
 
 export const cancelPendingOrder = (orderId) =>
   supabase.from('orders').update({ status: 'cancelled' }).eq('id', orderId).eq('status', 'pending');
+
+/** Congela no pedido a taxa aplicada — historico nao muda quando a taxa muda. */
+export const setOrderFee = (orderId, feeBps) =>
+  supabase.from('orders').update({ platform_fee_bps: feeBps }).eq('id', orderId);
 
 export const rpcExpirePending = () => supabase.rpc('expire_pending_orders');
 

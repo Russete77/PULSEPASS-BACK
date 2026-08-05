@@ -43,8 +43,14 @@ export async function createOrder({
   if (!event || event.status !== 'published') throw notFound('Evento indisponível');
 
   // Split/repasse: plataforma retém a taxa, produtora recebe o resto.
+  //
+  // A taxa é resolvida aqui e CONGELADA no pedido. Sem isso, mudar a taxa
+  // amanhã reescreveria o resultado de todos os eventos já realizados — e o
+  // relatório que a produtora conferiu na segunda mudaria sozinho na terça.
   const producerWalletId = event.organizations?.asaas_wallet_id ?? null;
-  const split = asaas.buildSplit(producerWalletId, env.asaas.platformFeePercent);
+  const { data: feeBps } = await repo.rpcEffectiveFee(event.organizations?.id ?? event.organization_id);
+  const feePercent = Number(feeBps ?? env.asaas.platformFeePercent * 100) / 100;
+  const split = asaas.buildSplit(producerWalletId, feePercent);
 
   // 1) reserva atômica + pedido pending (idempotente por Idempotency-Key)
   const { data: placed, error: pErr } = await repo.rpcPlaceOrder({
@@ -72,6 +78,9 @@ export async function createOrder({
     }
     return { ...base, payment_method: 'card' };
   }
+
+  // Congela a taxa aplicada nesta venda (ver comentário do split acima).
+  await repo.setOrderFee(orderId, Math.round(feePercent * 100));
 
   try {
     // 1.5) cupom (redenção atômica) — ajusta o total a cobrar
