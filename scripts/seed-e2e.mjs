@@ -69,9 +69,11 @@ async function main() {
   }).select('id').single();
 
   console.log('lotes (inteira/meia)…');
+  // Estoque generoso de proposito: a suite compra ingresso a cada execucao e
+  // um lote apertado faria o teste falhar por dado consumido, nao por bug.
   await db.from('ticket_tiers').insert([
-    { event_id: ev.id, name: 'Pista', price_cents: 5000, half_price_cents: 2500, quantity_total: 100, quantity_sold: 0, max_per_order: 6, position: 0, status: 'on_sale' },
-    { event_id: ev.id, name: 'VIP', price_cents: 12000, quantity_total: 20, quantity_sold: 0, max_per_order: 4, position: 1, status: 'on_sale' },
+    { event_id: ev.id, name: 'Pista', price_cents: 5000, half_price_cents: 2500, quantity_total: 100000, quantity_sold: 0, max_per_order: 6, position: 0, status: 'on_sale' },
+    { event_id: ev.id, name: 'VIP', price_cents: 12000, quantity_total: 100000, quantity_sold: 0, max_per_order: 4, position: 1, status: 'on_sale' },
   ]);
 
   console.log('cardápio (com estoque)…');

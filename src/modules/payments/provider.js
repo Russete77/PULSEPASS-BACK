@@ -107,7 +107,20 @@ export async function getPixQrCode(paymentId) {
 }
 
 export async function getPayment(paymentId) {
-  if (MOCK) return { id: paymentId, status: 'PENDING' };
+  if (MOCK) {
+    // Convenção do modo mock: `pay_mock_<STATUS>_<CENTAVOS>_...` devolve aquele
+    // status e valor. Sem isso não haveria como exercitar a reconciliação — que
+    // existe justamente para o caso em que o provedor diz "pago" e o webhook
+    // nunca chegou. O valor importa: a confirmação recusa cobrança com valor
+    // divergente do pedido, e um mock que devolve 0 esconderia essa proteção.
+    const m = /^pay_mock_([A-Z_]+)_(\d+)_/.exec(String(paymentId));
+    return {
+      id: paymentId,
+      status: m ? m[1] : 'PENDING',
+      billingType: 'PIX',
+      value: m ? Number(m[2]) / 100 : 0,
+    };
+  }
   return request(`/payments/${paymentId}`);
 }
 

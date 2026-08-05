@@ -28,6 +28,16 @@ export const findTopupForUser = (topupId, userId) =>
 export const rpcRefundWallet = (walletId) =>
   supabase.rpc('refund_wallet', { p_wallet: walletId });
 
+/** Existe recarga com esse id de cobranca? Decide se o evento e de recarga ou de pedido. */
+export const findTopupByPaymentId = (paymentId) =>
+  supabase.from('wallet_topups')
+    .select('id, profile_id, amount_cents, status')
+    .eq('asaas_payment_id', paymentId).maybeSingle();
+
+/** Reverte a recarga (estorno/chargeback). Pode deixar o saldo negativo. */
+export const rpcReverseTopup = (paymentId, kind, reason = null) =>
+  supabase.rpc('reverse_topup_payment', { p_payment_id: paymentId, p_kind: kind, p_reason: reason });
+
 export const rpcCreditTopup = (paymentId, paidValueCents = null) =>
   supabase.rpc('credit_topup', { p_payment_id: paymentId, p_paid_value_cents: paidValueCents });
 

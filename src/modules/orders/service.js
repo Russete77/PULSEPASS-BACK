@@ -264,3 +264,25 @@ export async function refundOrder({ user, orderId }) {
 
   return data;
 }
+
+/**
+ * Reverte um pedido cujo pagamento voltou (estorno, chargeback, reprovação de
+ * risco). Cancela os ingressos ainda não usados e devolve o estoque ao lote.
+ *
+ * Para quem JÁ ENTROU no evento não existe desfazer: a RPC abre um caso de
+ * fraude para a produtora decidir. Dizer que "cancelamos" seria mentira, e a
+ * casa precisa saber que alguém assistiu ao show sem pagar.
+ */
+export async function reverseOrderByPaymentId(asaasPaymentId, kind, reason = null) {
+  const { data, error } = await repo.rpcReverseOrder(asaasPaymentId, kind, reason);
+  if (error) throw error;
+
+  // Ingresso cancelado devolve vaga ao lote → chama a fila de espera.
+  if (data?.found && data.tickets_cancelled > 0) {
+    inviteWaitlistForOrder(data.order_id)
+      .catch((e) => logger.warn('fila: convite após reversão falhou', { error: e.message }));
+    cancelFiscalForOrder(data.order_id, `Pagamento revertido (${kind})`)
+      .catch((e) => logger.warn('fiscal: cancelamento após reversão falhou', { error: e.message }));
+  }
+  return data;
+}

@@ -43,6 +43,10 @@ export const findReplayOrder = (orderId) =>
 export const findOrderByPaymentId = (paymentId) =>
   supabase.from('orders').select('id, total_cents, status').eq('asaas_payment_id', paymentId).maybeSingle();
 
+/** Reverte o pedido (estorno/chargeback/risco): cancela ingresso, devolve estoque. */
+export const rpcReverseOrder = (paymentId, kind, reason = null) =>
+  supabase.rpc('reverse_order_payment', { p_payment_id: paymentId, p_kind: kind, p_reason: reason });
+
 export const rpcConfirmOrderPayment = (paymentId) =>
   supabase.rpc('confirm_order_payment', { p_payment_id: paymentId });
 

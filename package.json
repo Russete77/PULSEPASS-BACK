@@ -12,7 +12,8 @@
     "start": "node src/server.js",
     "lint": "eslint src && node scripts/check-boundaries.mjs && node scripts/check-openapi.mjs",
     "test": "node --test",
-    "migrate": "node scripts/migrate.mjs"
+    "migrate": "node scripts/migrate.mjs",
+    "reconcile": "node scripts/reconcile.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.0",

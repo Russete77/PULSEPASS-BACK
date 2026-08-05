@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { asaasMode } from '../modules/payments/provider.js';
+import { webhookHealth } from '../modules/payments/reconcile.js';
 import { supabase } from '../config/supabase.js';
 import { asyncHandler } from '../middleware/asyncHandler.js';
 import eventsRouter from '../modules/catalog/routes.js';
@@ -23,7 +24,17 @@ router.get('/health', (_req, res) =>
 router.get('/health/ready', asyncHandler(async (_req, res) => {
   const { error } = await supabase.from('events').select('id', { head: true, count: 'exact' }).limit(1);
   if (error) return res.status(503).json({ status: 'degraded', db: false });
-  res.json({ status: 'ready', db: true });
+
+  // A saúde da entrega de webhooks entra aqui porque fila interrompida no
+  // Asaas é invisível de fora: as vendas param de virar ingresso e ninguém
+  // percebe até o cliente reclamar. Como readiness, o monitor já alerta.
+  const webhooks = await webhookHealth().catch(() => null);
+  const degradado = Boolean(webhooks && !webhooks.healthy);
+  res.status(degradado ? 503 : 200).json({
+    status: degradado ? 'degraded' : 'ready',
+    db: true,
+    ...(webhooks ? { webhooks } : {}),
+  });
 }));
 
 router.use('/events', eventsRouter);

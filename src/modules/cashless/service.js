@@ -148,6 +148,11 @@ function mapBarError(message) {
   if (message.includes('ITEM_UNAVAILABLE')) return conflict('Item indisponível');
   if (message.includes('INSUFFICIENT_FUNDS')) return conflict('Saldo insuficiente. Recarregue a carteira.');
   if (message.includes('OUT_OF_STOCK')) return conflict('Item sem estoque');
+  // Carteira negativa após estorno de recarga já consumida. Sem este mapa o
+  // cliente recebe um 500 sem explicação e o barman não sabe o que dizer.
+  if (message.includes('WALLET_BLOCKED')) {
+    return conflict('Carteira bloqueada por pendência. Procure a organização do evento.');
+  }
   return null;
 }
 
@@ -258,6 +263,23 @@ export async function getCashierReport({ user, eventId }) {
 
 export async function listMyBarOrders({ user, limit = 50, offset = 0 }) {
   const { data, error } = await repo.findMyBarOrders(user.id, { limit, offset });
+  if (error) throw error;
+  return data;
+}
+
+/** O id de cobrança pertence a uma recarga? Decide o caminho do webhook. */
+export async function topupExists(asaasPaymentId) {
+  const { data } = await repo.findTopupByPaymentId(asaasPaymentId);
+  return Boolean(data);
+}
+
+/**
+ * Reverte uma recarga estornada. Se o saldo já foi gasto no bar, a carteira
+ * vai a NEGATIVO e é bloqueada — a bebida já foi consumida e a dívida é real.
+ * Fingir que o prejuízo não existe só o transfere para a produtora.
+ */
+export async function reverseTopupByPaymentId(asaasPaymentId, kind, reason = null) {
+  const { data, error } = await repo.rpcReverseTopup(asaasPaymentId, kind, reason);
   if (error) throw error;
   return data;
 }
