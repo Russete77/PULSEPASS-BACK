@@ -1,9 +1,24 @@
 // modules/catalog/service.js — regra do catálogo público.
 import { notFound } from '../../utils/ApiError.js';
+import { cached } from '../../lib/ttlCache.js';
 import * as repo from './repo.js';
+
+// Validade do cache da vitrine. 30s é o equilíbrio: absorve a enxurrada de
+// quando as vendas abrem (centenas de pessoas pedindo a MESMA lista no mesmo
+// minuto) sem fazer evento recém-publicado demorar a aparecer.
+//
+// O que pode ficar momentaneamente desatualizado é o "esgotado" da listagem, e
+// isso é seguro: quem clica cai no detalhe (sem cache) e a reserva de estoque
+// no checkout é atômica. Ninguém compra ingresso inexistente por causa daqui.
+const VITRINE_TTL_MS = 30_000;
 
 /** Lista eventos publicados (catálogo). Filtros opcionais: city, q. */
 export async function listEvents({ city, q } = {}) {
+  return cached(`vitrine:${city ?? ''}:${q ?? ''}`, VITRINE_TTL_MS,
+    () => carregarVitrine({ city, q }));
+}
+
+async function carregarVitrine({ city, q }) {
   const { data, error } = await repo.findPublishedEvents({ city, q });
   if (error) throw error;
   // Deriva "a partir de" (menor preço à venda) e disponibilidade para o catálogo.
