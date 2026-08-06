@@ -55,6 +55,11 @@ export const env = {
     from: process.env.EMAIL_FROM ?? '',
   },
 
+  // Chave que cifra segredos de terceiros no banco (hoje: apiKey da subconta
+  // Asaas da produtora). Fica FORA do banco de propósito — quem tiver só o dump
+  // não abre nada. Sem ela, criar subconta é recusado.
+  secretBoxKey: process.env.SECRET_BOX_KEY ?? '',
+
   // Fiscal (NFS-e). Sem credencial o provedor roda em MOCK: a nota é registrada
   // com número simulado, o fluxo inteiro fica testável e NADA é enviado à
   // prefeitura. Em produção sem credencial a nota fica 'pending' — o sistema

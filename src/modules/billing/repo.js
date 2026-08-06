@@ -11,7 +11,7 @@ export const updateDefaultFee = (feeBps, userId) =>
 
 export const listOrgFees = () =>
   supabase.from('organizations')
-    .select('id, name, fee_bps, asaas_wallet_id')
+    .select('id, name, fee_bps, asaas_wallet_id, asaas_account_id, asaas_account_status')
     .order('name', { ascending: true });
 
 export const findOrg = (orgId) =>
@@ -19,8 +19,14 @@ export const findOrg = (orgId) =>
 
 export const findOrgOwned = (orgId, userId) =>
   supabase.from('organizations')
-    .select('id, name, fee_bps, asaas_wallet_id')
+    // asaas_api_key_enc NUNCA entra no select: e segredo que da acesso total a
+    // conta da produtora e nenhuma rota precisa dele.
+    .select('id, name, fee_bps, asaas_wallet_id, asaas_account_id, asaas_account_status, asaas_onboarding_url')
     .eq('id', orgId).eq('owner_id', userId).maybeSingle();
+
+/** Grava os dados da subconta. A apiKey chega ja cifrada pelo service. */
+export const saveSubaccount = (orgId, patch) =>
+  supabase.from('organizations').update(patch).eq('id', orgId);
 
 export const updateOrgFee = (orgId, feeBps) =>
   supabase.from('organizations').update({ fee_bps: feeBps }).eq('id', orgId).select('fee_bps').single();

@@ -134,3 +134,72 @@ export async function refundPayment(paymentId, value) {
 }
 
 export const asaasMode = MOCK ? 'mock' : 'sandbox/live';
+
+// ═══════════════════ SUBCONTAS ═══════════════════
+//
+// Cria a conta Asaas da produtora pela API, já devolvendo o walletId usado no
+// split. Sem isto ela teria que abrir conta por fora, achar o walletId no
+// painel e colar no cockpit — e enquanto não cola, a venda dela fica retida
+// na nossa conta.
+//
+// Restrições da plataforma, documentadas para não virarem surpresa:
+//  · SÓ conta CNPJ pode criar subcontas;
+//  · operação nova entra em período de avaliação — até 10 subcontas, limite de
+//    R$ 2.000 em cobranças por subconta, por até 60 dias.
+//
+// Doc: https://docs.asaas.com/reference/criar-subconta
+
+/**
+ * @param {object} p dados cadastrais da produtora
+ * @returns {{id, walletId, apiKey, accountNumber, onboardingUrl, status}}
+ */
+export async function createSubaccount({
+  name, email, cpfCnpj, mobilePhone, incomeValue,
+  address, addressNumber, province, postalCode,
+  birthDate, companyType, complement, site, webhooks,
+}) {
+  if (MOCK) {
+    const id = `acc_mock_${Date.now()}`;
+    return {
+      id,
+      walletId: `wal_mock_${Math.random().toString(36).slice(2, 10)}`,
+      // No mock a apiKey é fictícia de propósito: se vazar em log de
+      // desenvolvimento, não abre conta nenhuma.
+      apiKey: `$aact_mock_${Math.random().toString(36).slice(2, 18)}`,
+      accountNumber: { agency: '0001', account: '000000', accountDigit: '0' },
+      onboardingUrl: null,
+      status: 'APPROVED',
+    };
+  }
+
+  const criada = await request('/accounts', {
+    method: 'POST',
+    body: {
+      name, email, cpfCnpj, mobilePhone,
+      incomeValue, address, addressNumber, province, postalCode,
+      ...(birthDate ? { birthDate } : {}),
+      ...(companyType ? { companyType } : {}),
+      ...(complement ? { complement } : {}),
+      ...(site ? { site } : {}),
+      // Webhook configurado JÁ na criação: a doc recomenda, porque evento de
+      // atualização de conta perdido significa não saber que a produtora foi
+      // aprovada (ou reprovada).
+      ...(webhooks ? { webhooks } : {}),
+    },
+  });
+
+  return {
+    id: criada.id,
+    walletId: criada.walletId,
+    apiKey: criada.accessToken?.apiKey ?? criada.apiKey ?? null,
+    accountNumber: criada.accountNumber ?? null,
+    onboardingUrl: criada.onboardingUrl ?? null,
+    status: criada.accountStatus ?? criada.status ?? 'PENDING',
+  };
+}
+
+/** Consulta a subconta (status de aprovação, pendências de documento). */
+export async function getSubaccount(accountId) {
+  if (MOCK) return { id: accountId, accountStatus: 'APPROVED', onboardingUrl: null };
+  return request(`/accounts/${encodeURIComponent(accountId)}`);
+}

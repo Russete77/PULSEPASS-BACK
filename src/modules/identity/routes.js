@@ -24,6 +24,9 @@ router.post('/organizations', asyncHandler(ctrl.createOrg));
 router.patch('/organizations/:orgId/asaas-wallet', asyncHandler(ctrl.setOrgWallet));
 // Transparencia do repasse: a produtora precisa conseguir conferir a conta.
 router.get('/organizations/:orgId/repasse', asyncHandler(billingCtrl.transparency));
+// Subconta Asaas: a produtora cria a propria conta sem sair do cockpit.
+router.post('/organizations/:orgId/asaas-subaccount', asyncHandler(billingCtrl.createSubaccount));
+router.post('/organizations/:orgId/asaas-subaccount/refresh', asyncHandler(billingCtrl.refreshSubaccount));
 
 router.get('/events', asyncHandler(ctrl.listEvents));
 router.post('/events', asyncHandler(ctrl.createEvent));

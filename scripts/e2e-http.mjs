@@ -7,6 +7,7 @@
 //
 // Uso: node scripts/e2e-http.mjs        (API precisa estar no ar em API_BASE)
 import 'dotenv/config';
+import { supabase as db } from '../src/config/supabase.js';
 
 const API = process.env.API_BASE || 'http://localhost:4000/api';
 const SB = process.env.SUPABASE_URL;
@@ -202,10 +203,24 @@ async function main() {
 
   // ── 8. integridade do ledger
   console.log('\n8) Integridade financeira');
-  const txs = await api('GET', '/wallet', { token: cliente });
-  const soma = (txs.data?.transactions ?? []).reduce((a, t) => a + t.amount_cents, 0);
-  check('ledger fecha: saldo = Σ transações', soma === txs.data?.balance_cents,
-    `Σ=${brl(soma)} saldo=${brl(txs.data?.balance_cents ?? 0)}`);
+  const carteira = await api('GET', '/wallet', { token: cliente });
+
+  // O extrato da API é paginado (últimas 50) — somar a página e comparar com o
+  // saldo total daria falso alarme assim que a carteira passasse de 50 lançamentos.
+  // O invariante precisa ser conferido contra TODAS as transações.
+  const { data: perfil } = await db.from('profiles').select('id')
+    .eq('email', 'e2e_cliente@pulsepass.test').single();
+  const { data: w } = await db.from('wallets').select('id, balance_cents')
+    .eq('profile_id', perfil.id).is('event_id', null).single();
+  const { data: todas } = await db.from('wallet_transactions')
+    .select('amount_cents').eq('wallet_id', w.id);
+  const soma = (todas ?? []).reduce((a, t) => a + t.amount_cents, 0);
+
+  check('ledger fecha: saldo = Σ de TODAS as transações', soma === w.balance_cents,
+    `Σ=${brl(soma)} saldo=${brl(w.balance_cents)} · ${todas.length} lançamentos`);
+  check('extrato da API vem paginado e ordenado', (carteira.data?.transactions?.length ?? 0) > 0
+    && carteira.data.transactions.length <= 50,
+    `${carteira.data?.transactions?.length} no extrato`);
 
   console.log(`\n═══ ${pass} passaram · ${fail} falharam ═══\n`);
   process.exit(fail ? 1 : 0);

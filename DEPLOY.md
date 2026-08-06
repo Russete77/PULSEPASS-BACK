@@ -15,12 +15,28 @@ Config padrão aqui é **Fly.io** (`fly.toml`), região São Paulo (`gru`).
 | `TICKET_QR_SECRET` | segredo forte (≥16 chars) — assina o QR rotativo |
 | `ADMIN_EMAILS` | e-mails do super-admin PulseADM, separados por vírgula |
 | `CORS_ORIGIN` | domínios dos fronts (ex: `https://app.pulsepass.com,https://cockpit.pulsepass.com`) |
+| `SECRET_BOX_KEY` | segredo forte (≥16 chars) — **cifra a apiKey das subcontas Asaas**. Sem ela, criar subconta é recusado |
 | `RESEND_API_KEY` | painel Resend → API Keys. **Sem ela o cliente não recebe o ingresso por e-mail** |
 | `EMAIL_FROM` | remetente verificado no Resend (ex: `ingressos@pulsepass.com`) |
 
 > Sem `RESEND_API_KEY` + `EMAIL_FROM` a entrega fica desligada — mas não falha
 > calada: cada pedido registra a tentativa como `skipped` em `email_deliveries`.
 > Quando a configuração entrar, `POST /orders/{id}/resend-tickets` reenvia.
+
+### Subcontas Asaas (abrir conta da produtora pela API)
+
+A produtora abre a conta pelo cockpit e o `walletId` já fica configurado para o
+split. Restrições da plataforma, que valem saber antes:
+
+- **Só conta CNPJ cria subcontas.** Conta pessoa física recebe erro 400.
+- Operação nova entra em **período de avaliação**: até 10 subcontas, limite de
+  R$ 2.000 em cobranças por subconta, por até 60 dias.
+- O Asaas devolve a `apiKey` da subconta **uma única vez**. Ela é guardada
+  cifrada com `SECRET_BOX_KEY` e **nunca** é devolvida por nenhuma rota — nem
+  para o super-admin. Perder a `SECRET_BOX_KEY` significa perder o acesso a
+  essas chaves de forma irreversível: guarde-a junto com os outros segredos.
+- Conta criada sem documento aprovado **não recebe**. Quando o Asaas exige
+  envio, o cockpit mostra o link de onboarding para a produtora.
 
 ### Fiscal (NFS-e) — opcional, mas obrigatório para faturar
 
