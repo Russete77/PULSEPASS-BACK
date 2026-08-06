@@ -10,7 +10,8 @@ Config padrão aqui é **Fly.io** (`fly.toml`), região São Paulo (`gru`).
 | `SUPABASE_URL` | painel Supabase → Settings → API |
 | `SUPABASE_SERVICE_ROLE_KEY` | painel Supabase → Settings → API (service_role) |
 | `SUPABASE_ANON_KEY` | painel Supabase → Settings → API (anon/publishable) |
-| `ASAAS_API_KEY` | painel Asaas (vazio = modo mock; em prod é obrigatório) |
+| `ASAAS_API_KEY` | painel Asaas (vazio = modo mock; em prod é obrigatório). Sandbox: `$aact_hmlg_…` · Produção: `$aact_prod_…` |
+| `ASAAS_BASE_URL` | **produção: `https://api.asaas.com/v3`** · sandbox: `https://api-sandbox.asaas.com/v3`. O padrão é o sandbox — em produção é obrigatório trocar |
 | `ASAAS_WEBHOOK_TOKEN` | você define e configura igual no webhook do Asaas |
 | `TICKET_QR_SECRET` | segredo forte (≥16 chars) — assina o QR rotativo |
 | `ADMIN_EMAILS` | e-mails do super-admin PulseADM, separados por vírgula |

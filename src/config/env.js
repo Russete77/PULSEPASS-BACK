@@ -81,3 +81,27 @@ if (env.isProd && !env.asaas.webhookToken) {
 if (env.isProd && (!process.env.TICKET_QR_SECRET || process.env.TICKET_QR_SECRET.length < 16)) {
   throw new Error('[env] TICKET_QR_SECRET (>=16 chars) é obrigatório em produção (QR de entrada seria forjável).');
 }
+
+// ── Coerência entre a chave do Asaas e o endereço da API ──
+//
+// O default de ASAAS_BASE_URL é o SANDBOX, de propósito: em desenvolvimento é o
+// certo. Mas subir em produção sem trocar apontaria dinheiro real para um
+// ambiente de teste — e o erro só apareceria quando a venda não caísse.
+//
+// A própria doc do Asaas alerta para o par errado: chave de sandbox
+// ($aact_hmlg_) só funciona em api-sandbox, e chave de produção ($aact_prod_)
+// só em api.asaas.com. Trocar os dois é erro de configuração silencioso.
+const ehSandbox = /api-sandbox\.asaas\.com/.test(env.asaas.baseUrl);
+const chave = env.asaas.apiKey || '';
+if (env.isProd && ehSandbox) {
+  throw new Error(
+    '[env] ASAAS_BASE_URL aponta para o SANDBOX em produção. '
+    + 'Use https://api.asaas.com/v3 — senão as vendas reais iriam para um ambiente de teste.',
+  );
+}
+if (chave.startsWith('$aact_hmlg_') && !ehSandbox) {
+  throw new Error('[env] chave de SANDBOX ($aact_hmlg_) com endereço de PRODUÇÃO. Confira ASAAS_BASE_URL.');
+}
+if (chave.startsWith('$aact_prod_') && ehSandbox) {
+  throw new Error('[env] chave de PRODUÇÃO ($aact_prod_) apontando para o SANDBOX. Confira ASAAS_BASE_URL.');
+}
