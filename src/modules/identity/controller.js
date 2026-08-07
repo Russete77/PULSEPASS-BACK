@@ -121,3 +121,35 @@ export async function setOrgWallet(req, res) {
 
   res.json({ data });
 }
+
+// ── Capa do evento ──
+// A imagem vai direto do navegador para o Storage; aqui só decidimos quem
+// pode enviar. Ver identity/service.js para o porquê.
+const coverSchema = z.object({
+  content_type: z.enum(['image/jpeg', 'image/png', 'image/webp', 'image/avif']),
+});
+export async function coverUpload(req, res) {
+  const p = coverSchema.safeParse(req.body);
+  if (!p.success) throw badRequest('Formato não aceito. Use JPG, PNG, WebP ou AVIF.', p.error.flatten());
+  res.json({
+    data: await service.createCoverUpload({
+      user: req.user, eventId: req.params.id, contentType: p.data.content_type,
+    }),
+  });
+}
+
+const confirmSchema = z.object({ path: z.string().min(3) });
+export async function coverConfirm(req, res) {
+  const p = confirmSchema.safeParse(req.body);
+  if (!p.success) throw badRequest('Payload inválido', p.error.flatten());
+  const data = await service.confirmCover({ user: req.user, eventId: req.params.id, path: p.data.path });
+  await audit.record({
+    req, action: 'event.cover_change', entity: 'events', entityId: req.params.id,
+    eventId: req.params.id, after: { cover_url: data.cover_url },
+  });
+  res.json({ data });
+}
+
+export async function coverRemove(req, res) {
+  res.json({ data: await service.removeCoverFromEvent({ user: req.user, eventId: req.params.id }) });
+}

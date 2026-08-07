@@ -1,6 +1,7 @@
 // modules/identity/service.js — perfil, organização, gestão de eventos e equipe (RBAC).
 import { notFound, forbidden, badRequest } from '../../utils/ApiError.js';
 import { env } from '../../config/env.js';
+import { logger } from '../../lib/logger.js';
 import { assertEventAccess } from './access.js';
 import * as repo from './repo.js';
 
@@ -187,4 +188,69 @@ export async function removeEventStaff({ user, eventId, staffId }) {
   const { error } = await repo.deleteEventStaff(staffId, eventId);
   if (error) throw error;
   return { removed: true };
+}
+
+// ═══════════════════ CAPA DO EVENTO ═══════════════════
+
+const EXTENSOES = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/avif': 'avif' };
+
+/**
+ * Autoriza o envio da capa e devolve uma URL assinada.
+ *
+ * O arquivo vai DIRETO do navegador para o Storage — não passa pela API de
+ * propósito: imagem de 5 MB subindo por aqui ocuparia processo que deveria
+ * estar validando ingresso na porta. O backend decide quem pode enviar e
+ * sob qual caminho; o Storage impõe tipo e tamanho.
+ */
+export async function createCoverUpload({ user, eventId, contentType }) {
+  const event = await assertEventAccess(user.id, eventId, ['manager']);
+  const ext = EXTENSOES[contentType];
+  if (!ext) throw badRequest('Formato não aceito. Use JPG, PNG, WebP ou AVIF.');
+
+  // Nome novo a cada envio: se reaproveitasse o mesmo, o CDN continuaria
+  // servindo a capa antiga por horas e a produtora acharia que não subiu.
+  const path = `${eventId}/${Date.now()}.${ext}`;
+  const { data, error } = await repo.createCoverUploadUrl(path);
+  if (error) throw error;
+  return { path, signed_url: data.signedUrl, token: data.token };
+}
+
+/** Confirma o envio: grava a URL pública no evento e limpa a capa anterior. */
+export async function confirmCover({ user, eventId, path }) {
+  await assertEventAccess(user.id, eventId, ['manager']);
+  // O caminho precisa pertencer a ESTE evento — senão bastaria informar o
+  // caminho da capa de outra produtora para roubá-la.
+  if (!String(path).startsWith(`${eventId}/`)) throw badRequest('Caminho inválido para este evento');
+
+  const { data: anterior } = await repo.findEvent(eventId);
+  const { data: pub } = repo.publicCoverUrl(path);
+  const { data, error } = await repo.updateEventCover(eventId, pub.publicUrl);
+  if (error) throw error;
+
+  // Capa antiga vira lixo pago: remove depois de trocar, e falha aqui não
+  // desfaz a troca — o evento já está com a capa nova.
+  const antigo = extrairCaminho(anterior?.cover_url);
+  if (antigo && antigo !== path) {
+    repo.removeCover([antigo]).catch((e) => logger.warn('capa: falha ao remover a anterior', { error: e.message }));
+  }
+  return data;
+}
+
+/** Remove a capa e volta ao fundo padrão. */
+export async function removeCoverFromEvent({ user, eventId }) {
+  await assertEventAccess(user.id, eventId, ['manager']);
+  const { data: event } = await repo.findEvent(eventId);
+  const caminho = extrairCaminho(event?.cover_url);
+  const { data } = await repo.updateEventCover(eventId, null);
+  if (caminho) {
+    repo.removeCover([caminho]).catch((e) => logger.warn('capa: falha ao remover', { error: e.message }));
+  }
+  return data;
+}
+
+/** Extrai `<evento>/<arquivo>` de uma URL pública do Storage. */
+function extrairCaminho(url) {
+  if (!url) return null;
+  const m = /\/event-covers\/(.+)$/.exec(url);
+  return m ? decodeURIComponent(m[1]) : null;
 }

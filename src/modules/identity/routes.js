@@ -33,6 +33,10 @@ router.post('/events', asyncHandler(ctrl.createEvent));
 router.get('/events/:id', asyncHandler(ctrl.eventDetail));
 router.patch('/events/:id/status', asyncHandler(ctrl.setStatus));
 router.get('/events/:id/dashboard', asyncHandler(ctrl.dashboard));
+// Capa do evento: a imagem e a peca principal da tela do cliente.
+router.post('/events/:id/cover-upload', asyncHandler(ctrl.coverUpload));
+router.post('/events/:id/cover', asyncHandler(ctrl.coverConfirm));
+router.delete('/events/:id/cover', asyncHandler(ctrl.coverRemove));
 router.get('/events/:id/reconciliation', asyncHandler(ctrl.reconciliation));
 
 // Equipe do evento (RBAC) — manager / door / bar

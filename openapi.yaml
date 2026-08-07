@@ -393,6 +393,11 @@ paths:
     get: { tags: [admin], summary: Casos de fraude do evento (ingresso usado com pagamento revertido), parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }], responses: { "200": { description: casos } } }
   /admin/fraud-cases/{caseId}/resolve:
     post: { tags: [admin], summary: Marca o caso de fraude como resolvido, parameters: [{ name: caseId, in: path, required: true, schema: { type: string, format: uuid } }], responses: { "200": { description: resolvido } } }
+  /admin/events/{id}/cover-upload:
+    post: { tags: [admin], summary: Autoriza o envio da capa e devolve URL assinada, parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }], responses: { "200": { description: url assinada } } }
+  /admin/events/{id}/cover:
+    post: { tags: [admin], summary: Confirma a capa enviada e grava no evento, parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }], responses: { "200": { description: evento com a capa } } }
+    delete: { tags: [admin], summary: Remove a capa do evento, parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }], responses: { "200": { description: removida } } }
   /admin/events/{id}/audit:
     get: { tags: [admin], summary: Trilha de auditoria do evento (quem fez o que), parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }, { name: action, in: query, schema: { type: string } }, { name: money, in: query, schema: { type: string } }], responses: { "200": { description: entradas } } }
   /admin/events/{id}/waitlist:

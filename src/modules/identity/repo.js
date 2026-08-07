@@ -83,4 +83,24 @@ export const findMyStaffAssignments = (userId) =>
     .eq('user_id', userId)
     .order('created_at', { ascending: false });
 
+/**
+ * URL assinada para a produtora enviar a capa DIRETO ao Storage.
+ *
+ * O arquivo nao passa pelo nosso servidor de proposito: imagem de 5 MB
+ * subindo pela API ocuparia processo que devia estar validando ingresso na
+ * porta. O backend so decide QUEM pode enviar e por qual caminho.
+ */
+export const createCoverUploadUrl = (path) =>
+  supabase.storage.from('event-covers').createSignedUploadUrl(path);
+
+export const publicCoverUrl = (path) =>
+  supabase.storage.from('event-covers').getPublicUrl(path);
+
+export const removeCover = (paths) =>
+  supabase.storage.from('event-covers').remove(paths);
+
+export const updateEventCover = (eventId, coverUrl) =>
+  supabase.from('events').update({ cover_url: coverUrl }).eq('id', eventId)
+    .select('id, cover_url').single();
+
 export { findProfileByEmail };
