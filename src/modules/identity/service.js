@@ -125,7 +125,24 @@ export async function listMyEvents({ user, limit = 100, offset = 0 }) {
 export async function setEventStatus({ user, eventId, status }) {
   const allowed = ['draft', 'published', 'paused', 'ended', 'cancelled'];
   if (!allowed.includes(status)) throw badRequest('Status inválido');
-  await assertEventManage(user.id, eventId);
+  const event = await assertEventManage(user.id, eventId);
+
+  // Publicar sem capa é proibido.
+  //
+  // A vitrine é a porta de entrada do produto: um evento sem imagem entre os
+  // outros derruba a percepção de todos — e a produtora que publica assim
+  // vende menos sem entender por quê. A regra vale só na TRANSIÇÃO para
+  // publicado: rascunho segue sem capa, e evento já no ar não é derrubado.
+  //
+  // A checagem mora aqui, não na tela: bloquear só no botão seria contornável
+  // chamando a API direto.
+  if (status === 'published' && !event.cover_url) {
+    throw badRequest(
+      'Adicione a capa do evento antes de publicar. '
+      + 'A imagem é a primeira coisa que a pessoa vê na vitrine e no ingresso.',
+    );
+  }
+
   const { data, error } = await repo.updateEventStatus(eventId, status);
   if (error) throw error;
   return data;

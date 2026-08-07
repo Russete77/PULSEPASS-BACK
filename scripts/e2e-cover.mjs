@@ -109,6 +109,43 @@ async function main() {
     .order('at', { ascending: false }).limit(1).maybeSingle();
   check('troca de capa auditada', !!trilha?.after?.cover_url);
 
+  console.log('\n10) BLOQUEIO — publicar sem capa');
+  // O evento ficou sem capa no passo 8. A tentativa vai DIRETO pela API, que é
+  // o caminho de quem contornaria o botão desabilitado na tela: a regra tem que
+  // morar no servidor, não no clique.
+  const estadoOriginal = (await api('GET', `/admin/events/${eventId}`, { token: produtora })).data?.status;
+  await api('PATCH', `/admin/events/${eventId}/status`, { token: produtora, body: { status: 'draft' } });
+
+  const semCapa = await api('PATCH', `/admin/events/${eventId}/status`, {
+    token: produtora, body: { status: 'published' },
+  });
+  check('publicar sem capa é RECUSADO pelo servidor', semCapa.status === 400,
+    semCapa.body?.error?.message?.slice(0, 52));
+
+  const rascunho = await api('PATCH', `/admin/events/${eventId}/status`, {
+    token: produtora, body: { status: 'draft' },
+  });
+  check('rascunho continua livre sem capa', rascunho.status === 200);
+
+  // Com capa, publica normalmente — o bloqueio não pode virar prisão.
+  const nova = await api('POST', `/admin/events/${eventId}/cover-upload`, {
+    token: produtora, body: { content_type: 'image/png' },
+  });
+  await fetch(nova.data.signed_url, {
+    method: 'PUT', headers: { 'content-type': 'image/png' }, body: PNG_1X1,
+  });
+  await api('POST', `/admin/events/${eventId}/cover`, { token: produtora, body: { path: nova.data.path } });
+
+  const comCapa = await api('PATCH', `/admin/events/${eventId}/status`, {
+    token: produtora, body: { status: 'published' },
+  });
+  check('com capa, publica normalmente', comCapa.status === 200, `status=${comCapa.data?.status}`);
+
+  // Devolve o evento ao estado em que estava, pra não afetar os outros testes.
+  if (estadoOriginal && estadoOriginal !== 'published') {
+    await api('PATCH', `/admin/events/${eventId}/status`, { token: produtora, body: { status: estadoOriginal } });
+  }
+
   console.log(`\n═══ ${pass} passaram · ${fail} falharam ═══\n`);
   process.exit(fail ? 1 : 0);
 }
