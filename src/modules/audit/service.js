@@ -8,6 +8,7 @@
 // O oposto também vale: a trilha é imutável no banco (sem UPDATE/DELETE, nem
 // para o service_role), então o que entra aqui não pode ser maquiado depois.
 import { logger } from '../../lib/logger.js';
+import { notFound } from '../../utils/ApiError.js';
 import { assertEventAccess } from '../identity/access.js';
 import * as repo from './repo.js';
 
@@ -59,4 +60,35 @@ export async function eventTrail({ user, eventId, action, moneyOnly, limit }) {
   });
   if (error) throw error;
   return { entries: data ?? [] };
+}
+
+/**
+ * Casos de fraude do evento.
+ *
+ * São situações que o sistema não consegue desfazer sozinho: alguém entrou na
+ * festa e depois estornou o pagamento, ou bebeu no bar e estornou a recarga.
+ * A decisão (cobrar, bloquear, deixar passar) é da casa — nosso papel é não
+ * deixar isso invisível.
+ */
+export async function fraudCases({ user, eventId }) {
+  await assertEventAccess(user.id, eventId, ['manager']);
+  const { data, error } = await repo.findFraudCases(eventId);
+  if (error) throw error;
+  const casos = data ?? [];
+  return {
+    abertos: casos.filter((c) => !c.resolved_at).length,
+    prejuizo_aberto_cents: casos.filter((c) => !c.resolved_at)
+      .reduce((a, c) => a + (c.amount_cents ?? 0), 0),
+    cases: casos,
+  };
+}
+
+/** Marca o caso como resolvido — a casa decidiu o que fazer. */
+export async function resolveFraudCase({ user, caseId }) {
+  const { data: caso } = await repo.findFraudCase(caseId);
+  if (!caso) throw notFound('Caso não encontrado');
+  await assertEventAccess(user.id, caso.event_id, ['manager']);
+  const { data, error } = await repo.resolveFraudCase(caseId);
+  if (error) throw error;
+  return data;
 }

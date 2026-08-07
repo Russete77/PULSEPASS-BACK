@@ -389,6 +389,10 @@ paths:
     post: { tags: [admin], summary: Reconsulta o status de aprovacao da subconta, parameters: [{ name: orgId, in: path, required: true, schema: { type: string, format: uuid } }], responses: { "200": { description: status } } }
   /admin/organizations/{orgId}/repasse:
     get: { tags: [admin], summary: Transparencia do repasse (como o dinheiro e calculado), parameters: [{ name: orgId, in: path, required: true, schema: { type: string, format: uuid } }], responses: { "200": { description: explicacao e exemplo } } }
+  /admin/events/{id}/fraud-cases:
+    get: { tags: [admin], summary: Casos de fraude do evento (ingresso usado com pagamento revertido), parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }], responses: { "200": { description: casos } } }
+  /admin/fraud-cases/{caseId}/resolve:
+    post: { tags: [admin], summary: Marca o caso de fraude como resolvido, parameters: [{ name: caseId, in: path, required: true, schema: { type: string, format: uuid } }], responses: { "200": { description: resolvido } } }
   /admin/events/{id}/audit:
     get: { tags: [admin], summary: Trilha de auditoria do evento (quem fez o que), parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }, { name: action, in: query, schema: { type: string } }, { name: money, in: query, schema: { type: string } }], responses: { "200": { description: entradas } } }
   /admin/events/{id}/waitlist:

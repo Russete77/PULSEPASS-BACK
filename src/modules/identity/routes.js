@@ -57,6 +57,8 @@ router.get('/events/:id/box-office/report', asyncHandler(boxoffice.report));
 // Fiscal (NFS-e) — módulo fiscal
 // Trilha de auditoria (quem fez o que)
 router.get('/events/:id/audit', asyncHandler(auditCtrl.eventTrail));
+router.get('/events/:id/fraud-cases', asyncHandler(auditCtrl.fraudCases));
+router.post('/fraud-cases/:caseId/resolve', asyncHandler(auditCtrl.resolveFraudCase));
 router.get('/events/:id/waitlist', asyncHandler(waitlistCtrl.listForEvent));
 
 router.get('/events/:id/fiscal', asyncHandler(fiscal.list));

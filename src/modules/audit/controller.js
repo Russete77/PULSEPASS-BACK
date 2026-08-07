@@ -9,3 +9,11 @@ export async function eventTrail(req, res) {
     }),
   });
 }
+
+export async function fraudCases(req, res) {
+  res.json({ data: await service.fraudCases({ user: req.user, eventId: req.params.id }) });
+}
+
+export async function resolveFraudCase(req, res) {
+  res.json({ data: await service.resolveFraudCase({ user: req.user, caseId: req.params.caseId }) });
+}
