@@ -76,6 +76,57 @@ export const rpcPlaceBarOrder = ({ buyerId, eventId, items, idempotencyKey }) =>
 export const setBarOrderOperator = (orderId, operatorId) =>
   supabase.from('bar_orders').update({ operator_id: operatorId }).eq('id', orderId);
 
+// ── Serviço de bar: cozinha, garçom e totem ──
+
+/** Marca a origem do pedido: qual mesa, qual praça, qual garçom. */
+export const setBarOrderOrigin = (orderId, { tableId = null, waiterId = null, station = null }) =>
+  supabase.from('bar_orders')
+    .update({ table_id: tableId, waiter_id: waiterId, station })
+    .eq('id', orderId).select().single();
+
+/**
+ * Fila da cozinha: só o que está em aberto, mais velho primeiro.
+ *
+ * Ordenar por chegada e não por status é o ponto. A cozinha trabalha por
+ * ordem de fila, e um pedido parado em 'preparing' há dez minutos é mais
+ * urgente que um 'paid' que acabou de entrar.
+ */
+export const findKitchenQueue = (eventId) =>
+  supabase.from('bar_orders')
+    .select(`
+      id, status, total_cents, pickup_code, station, created_at,
+      preparing_at, ready_at,
+      profiles:buyer_id (full_name, email),
+      event_tables:table_id (name, area),
+      bar_order_items (name, quantity, notes)
+    `)
+    .eq('event_id', eventId)
+    .in('status', ['paid', 'preparing', 'ready'])
+    .order('created_at', { ascending: true })
+    .limit(120);
+
+export const rpcAdvanceBarOrder = ({ orderId, para, operadorId = null, station = null }) =>
+  supabase.rpc('advance_bar_order', {
+    p_order: orderId, p_para: para, p_operador: operadorId, p_station: station,
+  });
+
+export const findBarOrderEvent = (orderId) =>
+  supabase.from('bar_orders').select('id, event_id, status').eq('id', orderId).maybeSingle();
+
+/** Mesas ativas do evento — a tela do garçom. */
+export const findActiveTables = (eventId) =>
+  supabase.from('event_tables')
+    .select('id, name, area, capacity, active, position')
+    .eq('event_id', eventId).eq('active', true)
+    .order('position', { ascending: true });
+
+export const findOpenOrdersByTable = (eventId) =>
+  supabase.from('bar_orders')
+    .select('id, table_id, status, total_cents, created_at, bar_order_items(name, quantity)')
+    .eq('event_id', eventId)
+    .not('table_id', 'is', null)
+    .in('status', ['paid', 'preparing', 'ready']);
+
 export const rpcCashierReport = (eventId) => supabase.rpc('cashier_report', { p_event: eventId });
 
 // Integridade do ledger: carteiras cujo saldo diverge da soma das transações.

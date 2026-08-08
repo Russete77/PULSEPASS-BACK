@@ -12,26 +12,62 @@ import * as repo from './repo.js';
 // no checkout é atômica. Ninguém compra ingresso inexistente por causa daqui.
 const VITRINE_TTL_MS = 30_000;
 
-/** Lista eventos publicados (catálogo). Filtros opcionais: city, q. */
-export async function listEvents({ city, q } = {}) {
-  return cached(`vitrine:${city ?? ''}:${q ?? ''}`, VITRINE_TTL_MS,
-    () => carregarVitrine({ city, q }));
+/** Lista eventos publicados (catálogo). Filtros opcionais: city, q, category. */
+export async function listEvents({ city, q, category } = {}) {
+  return cached(`vitrine:${city ?? ''}:${q ?? ''}:${category ?? ''}`, VITRINE_TTL_MS,
+    () => carregarVitrine({ city, q, category }));
 }
 
-async function carregarVitrine({ city, q }) {
-  const { data, error } = await repo.findPublishedEvents({ city, q });
+/**
+ * Cidades que de fato têm evento publicado, com a contagem.
+ *
+ * Lista fixa de capitais ofereceria "Manaus" sem nada dentro. Esta sai do que
+ * existe, para a pessoa saber onde vale procurar.
+ */
+export async function listCities() {
+  return cached('vitrine:cidades', VITRINE_TTL_MS, async () => {
+    const { data, error } = await repo.findPublishedCities();
+    if (error) throw error;
+    const mapa = new Map();
+    for (const e of data ?? []) {
+      const chave = `${e.city}/${e.state}`;
+      mapa.set(chave, (mapa.get(chave) ?? 0) + 1);
+    }
+    return [...mapa.entries()]
+      .map(([chave, eventos]) => {
+        const [city, state] = chave.split('/');
+        return { city, state, eventos };
+      })
+      .sort((a, b) => b.eventos - a.eventos || a.city.localeCompare(b.city, 'pt-BR'));
+  });
+}
+
+async function carregarVitrine({ city, q, category }) {
+  const { data, error } = await repo.findPublishedEvents({ city, q, category });
   if (error) throw error;
-  // Deriva "a partir de" (menor preço à venda) e disponibilidade para o catálogo.
   return (data ?? []).map((ev) => {
     const tiers = ev.ticket_tiers ?? [];
     const onSale = tiers.filter((t) => t.status === 'on_sale' && (t.quantity_total - t.quantity_sold) > 0);
     const prices = (onSale.length ? onSale : tiers).map((t) => t.price_cents).filter((p) => p != null);
     const soldOut = tiers.length > 0 && onSale.length === 0;
+
+    // O percentual vendido é o que transforma um card em decisão. "87%
+    // vendido" faz comprar; nome e data, não. O dado sempre existiu nos
+    // lotes — era só ninguém somar.
+    const total = tiers.reduce((s, t) => s + (t.quantity_total ?? 0), 0);
+    const vendidos = tiers.reduce((s, t) => s + (t.quantity_sold ?? 0), 0);
+    const pct = total > 0 ? Math.round((vendidos / total) * 100) : 0;
+
     const { ticket_tiers, ...rest } = ev;
     return {
       ...rest,
       min_price_cents: prices.length ? Math.min(...prices) : null,
       sold_out: soldOut,
+      sold_pct: pct,
+      // O selo só acende a partir de 70%. Abaixo disso "40% vendido" não
+      // apressa ninguém — e apressar sem motivo é o que gasta o selo para
+      // quando ele de fato importa.
+      urgencia: soldOut ? 'esgotado' : pct >= 70 ? 'esgotando' : null,
     };
   });
 }

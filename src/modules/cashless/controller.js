@@ -69,13 +69,29 @@ export async function menu(req, res) {
   res.json({ data: await service.getMenu(req.params.slug) });
 }
 
+const itensSchema = z.array(z.object({
+  menu_item_id: z.string().uuid(),
+  quantity: z.number().int().positive(),
+  notes: z.string().max(140).optional(),
+})).min(1);
+
 const barOrderSchema = z.object({
   eventSlug: z.string().min(1),
-  items: z.array(z.object({
-    menu_item_id: z.string().uuid(),
-    quantity: z.number().int().positive(),
-    notes: z.string().max(140).optional(),
-  })).min(1),
+  items: itensSchema,
+});
+
+// Só etapas para FRENTE. Qual transição é legal a partir do estado atual é
+// decidido no banco; aqui só se recusa nome inventado.
+const advanceSchema = z.object({
+  para: z.enum(['preparing', 'ready', 'delivered', 'cancelled']),
+  station: z.string().max(60).optional(),
+});
+
+const waiterOrderSchema = z.object({
+  buyer_id: z.string().uuid(),
+  table_id: z.string().uuid().optional(),
+  station: z.string().max(60).optional(),
+  items: itensSchema,
 });
 
 export async function createBarOrder(req, res) {
@@ -126,4 +142,37 @@ export async function cashierReport(req, res) {
 // Integridade do ledger (drift-check)
 export async function ledgerCheck(req, res) {
   res.json({ data: await service.getLedgerCheck({ user: req.user, eventId: req.params.id }) });
+}
+
+// ── Serviço de bar: cozinha, garçom, totem ──
+
+export async function kitchenQueue(req, res) {
+  res.json({ data: await service.getKitchenQueue({ user: req.user, eventId: req.params.id }) });
+}
+
+export async function barOrderAdvance(req, res) {
+  const p = advanceSchema.safeParse(req.body);
+  if (!p.success) throw badRequest('Payload inválido', p.error.flatten());
+  res.json({
+    data: await service.advanceBarOrder({
+      user: req.user, orderId: req.params.orderId, para: p.data.para, station: p.data.station ?? null,
+    }),
+  });
+}
+
+export async function waiterBoard(req, res) {
+  res.json({ data: await service.getWaiterBoard({ user: req.user, eventId: req.params.id }) });
+}
+
+export async function waiterOrder(req, res) {
+  const p = waiterOrderSchema.safeParse(req.body);
+  if (!p.success) throw badRequest('Payload inválido', p.error.flatten());
+  res.status(201).json({
+    data: await service.placeWaiterOrder({
+      user: req.user, eventId: req.params.id,
+      tableId: p.data.table_id ?? null, buyerId: p.data.buyer_id,
+      items: p.data.items, station: p.data.station ?? null,
+      idempotencyKey: req.get('Idempotency-Key') ?? null,
+    }),
+  });
 }

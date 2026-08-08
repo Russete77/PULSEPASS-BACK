@@ -77,7 +77,7 @@ async function assertEventManage(userId, eventId, roles = ['manager']) {
 
 export async function createEvent({ user, payload }) {
   const { organization_id, title, description, venue_name, address, city, state, starts_at, ends_at,
-    service_fee_bps, reentry_enabled, reentry_max, tiers } = payload;
+    service_fee_bps, reentry_enabled, reentry_max, category, latitude, longitude, tiers } = payload;
   if (!title || !city || !state || !starts_at) throw badRequest('Campos obrigatórios faltando');
   await assertOrgOwner(user.id, organization_id);
 
@@ -85,6 +85,8 @@ export async function createEvent({ user, payload }) {
     organization_id, title, slug: slugify(title),
     description: description ?? null, venue_name: venue_name ?? null, address: address ?? null,
     city, state, starts_at, ends_at: ends_at ?? null, status: 'draft',
+    category: category ?? 'outro',
+    latitude: latitude ?? null, longitude: longitude ?? null,
     service_fee_bps: Math.min(10000, Math.max(0, Math.round(Number(service_fee_bps) || 0))),
     reentry_enabled: reentry_enabled === true,
     reentry_max: reentry_enabled === true ? (reentry_max ?? null) : null,

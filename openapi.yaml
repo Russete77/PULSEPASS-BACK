@@ -120,6 +120,8 @@ paths:
         - { name: city, in: query, schema: { type: string } }
         - { name: q, in: query, schema: { type: string } }
       responses: { "200": { description: lista } }
+  /events/cidades:
+    get: { tags: [catalog], summary: Cidades com evento publicado (alimenta o seletor da vitrine), responses: { "200": { description: cidades com contagem } } }
   /events/{slug}:
     get:
       tags: [catalog]
@@ -371,6 +373,14 @@ paths:
     patch: { tags: [admin], summary: Confirmar/recusar reserva, parameters: [{ name: reservationId, in: path, required: true, schema: { type: string, format: uuid } }], responses: { "200": { description: reserva } } }
   /admin/events/{id}/cashier:
     get: { tags: [admin], summary: Fechamento de caixa (por operador), parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }], responses: { "200": { description: fechamento } } }
+  /admin/events/{id}/kds:
+    get: { tags: [admin], summary: Fila da cozinha (pedidos em aberto, mais velho primeiro), parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }], responses: { "200": { description: fila com tempo de espera e origem } } }
+  /admin/events/{id}/waiter:
+    get: { tags: [admin], summary: Mesas com consumo em aberto (tela do garcom), parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }], responses: { "200": { description: mesas } } }
+  /admin/events/{id}/waiter-orders:
+    post: { tags: [admin], summary: Lanca pedido do garcom numa mesa, parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }], responses: { "201": { description: pedido pago } } }
+  /admin/bar-orders/{orderId}/status:
+    patch: { tags: [admin], summary: Avanca o pedido do bar (preparing/ready/delivered/cancelled), parameters: [{ name: orderId, in: path, required: true, schema: { type: string, format: uuid } }], responses: { "200": { description: pedido atualizado } } }
   /orders/{id}/resend-tickets:
     post: { tags: [orders], summary: Reenvia os ingressos por e-mail (pedido pago), parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }], responses: { "200": { description: resultado do envio e historico de tentativas } } }
   /admin/events/{id}/guests/summary:

@@ -76,6 +76,14 @@ router.delete('/menu-items/:itemId', asyncHandler(menu.menuDelete));
 router.get('/events/:id/cashier', asyncHandler(menu.cashierReport));
 router.get('/events/:id/ledger-check', asyncHandler(menu.ledgerCheck));
 
+// Serviço de bar: cozinha (KDS), garçom e totem.
+// O ciclo paid → preparing → ready → delivered existia no banco desde a
+// migration 0003 e nunca teve por onde ser percorrido.
+router.get('/events/:id/kds', asyncHandler(menu.kitchenQueue));
+router.patch('/bar-orders/:orderId/status', asyncHandler(menu.barOrderAdvance));
+router.get('/events/:id/waiter', asyncHandler(menu.waiterBoard));
+router.post('/events/:id/waiter-orders', asyncHandler(menu.waiterOrder));
+
 // Camarotes / reservas (AZList) — módulo tables
 router.get('/events/:id/tables', asyncHandler(tables.adminList));
 router.post('/events/:id/tables', asyncHandler(tables.adminCreate));
