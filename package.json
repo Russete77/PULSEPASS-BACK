@@ -12,6 +12,8 @@
     "start": "node src/server.js",
     "lint": "eslint src && node scripts/check-boundaries.mjs && node scripts/check-openapi.mjs",
     "test": "node --test",
+    "test:e2e": "node scripts/e2e-run.mjs",
+    "test:all": "npm test && npm run test:e2e",
     "migrate": "node scripts/migrate.mjs",
     "reconcile": "node scripts/reconcile.mjs",
     "asaas:check": "node scripts/asaas-check.mjs"

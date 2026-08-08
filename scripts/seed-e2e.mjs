@@ -23,24 +23,87 @@ const iso = (d) => new Date(d).toISOString();
 const now = Date.now();
 
 async function cleanup() {
-  const { data: list } = await db.auth.admin.listUsers({ page: 1, perPage: 300 });
-  const ours = (list?.users || []).filter((u) => Object.values(EMAILS).includes(u.email));
-  const ids = ours.map((u) => u.id);
+  // Busca por e-mail na tabela de perfis em vez de varrer a primeira página de
+  // usuários: listUsers tem teto de página, e no dia em que o banco passar dele
+  // a limpeza silenciosamente pararia de achar as fixtures.
+  const { data: perfis } = await db.from('profiles').select('id').in('email', Object.values(EMAILS));
+  const ids = (perfis || []).map((p) => p.id);
   const { data: orgs } = ids.length ? await db.from('organizations').select('id').in('owner_id', ids) : { data: [] };
   const orgIds = (orgs || []).map((o) => o.id);
   const { data: evts } = orgIds.length ? await db.from('events').select('id').in('organization_id', orgIds) : { data: [] };
-  const evtIds = (evts || []).map((e) => e.id);
-  const del = async (t, c, v) => { if (v.length) { try { await db.from(t).delete().in(c, v); } catch (e) { /* noop */ } } };
-  for (const t of ['table_reservations', 'event_tables', 'guests', 'promoters', 'coupons', 'wallet_topups', 'bar_orders', 'orders', 'wallets', 'menu_items', 'ticket_tiers', 'event_staff']) {
-    await del(t, 'event_id', evtIds);
+  const evtIds = new Set((evts || []).map((e) => e.id));
+
+  // O evento do cenário também é caçado pelo SLUG, não só pelo dono atual.
+  // Execuções antigas deixaram eventos órfãos — a org apontava para um usuário
+  // que sumiu — e como o slug é único, a inserção seguinte batia nele e voltava
+  // null. O sintoma era "Cannot read properties of null", que não diz nada.
+  const { data: porSlug } = await db.from('events').select('id, organization_id').eq('slug', SLUG);
+  for (const e of porSlug || []) { evtIds.add(e.id); if (e.organization_id) orgIds.push(e.organization_id); }
+
+  const alvos = [...evtIds];
+  if (!alvos.length) return;
+
+  // Falha de limpeza precisa APARECER. Antes o catch vazio escondia tudo: a
+  // remoção do evento era recusada por chave estrangeira, o script anunciava
+  // "limpei" e só quebrava adiante, no slug duplicado.
+  const del = async (tabela, coluna, valores) => {
+    if (!valores.length) return;
+    const { error } = await db.from(tabela).delete().in(coluna, valores);
+    if (error) console.warn(`  ! ${tabela}: ${error.message}`);
+  };
+
+  // A ordem abaixo segue as chaves estrangeiras, do galho para o tronco.
+  // Quatro tabelas apontam para events com NO ACTION — tickets, box_office_sales,
+  // bar_orders e orders — e nenhuma delas sai sozinha quando o evento cai.
+  const { data: pedidos } = await db.from('orders').select('id').in('event_id', alvos);
+  const pedidoIds = (pedidos || []).map((o) => o.id);
+
+  // fiscal_documents é RESTRICT sobre orders: enquanto houver nota emitida,
+  // o pedido não sai — e sem o pedido, o evento também não.
+  await del('fiscal_documents', 'order_id', pedidoIds);
+
+  // tickets leva junto gate_movements e ticket_transfers (ambos CASCADE).
+  await del('tickets', 'event_id', alvos);
+  await del('box_office_sales', 'event_id', alvos);
+  await del('bar_orders', 'event_id', alvos);
+  await del('orders', 'event_id', alvos);
+
+  for (const t of ['table_reservations', 'event_tables', 'guests', 'promoters', 'coupons',
+    'waitlist', 'fraud_cases', 'wallet_topups', 'wallets', 'menu_items', 'ticket_tiers', 'event_staff']) {
+    await del(t, 'event_id', alvos);
   }
-  await del('events', 'id', evtIds);
-  await del('organizations', 'id', orgIds);
-  for (const id of ids) { try { await db.auth.admin.deleteUser(id); } catch (e) { /* noop */ } }
+  await del('events', 'id', alvos);
+  await del('organizations', 'id', [...new Set(orgIds)]);
+  // Os USUÁRIOS ficam de propósito. Apagar conta de auth devolve 500 opaco
+  // assim que sobra qualquer referência a ela no banco (carteira, pedido,
+  // linha de auditoria), e o erro vinha sendo engolido por um catch vazio: a
+  // semeadura anunciava "limpei" e a criação seguinte morria com "já
+  // cadastrado". Reaproveitar é mais firme — a identidade da fixture é
+  // estável, o que precisa nascer limpo é o cenário.
 }
 
+/**
+ * Cria a fixture ou reaproveita a que já existe.
+ *
+ * Idempotência de verdade: a senha é reescrita a cada execução (assim uma
+ * troca manual no painel não quebra o login das suítes) e o papel é
+ * reaplicado, caso algum teste o tenha alterado.
+ */
 async function makeUser(email, role) {
-  const { data, error } = await db.auth.admin.createUser({ email, password: PW, email_confirm: true, user_metadata: { full_name: email.split('@')[0] } });
+  const { data: existente } = await db.from('profiles').select('id').eq('email', email).maybeSingle();
+
+  if (existente?.id) {
+    const { error } = await db.auth.admin.updateUserById(existente.id, {
+      password: PW, email_confirm: true,
+    });
+    if (error) throw new Error(`${email}: não deu pra recuperar a fixture — ${error.message}`);
+    if (role) await db.from('profiles').update({ role }).eq('id', existente.id);
+    return existente.id;
+  }
+
+  const { data, error } = await db.auth.admin.createUser({
+    email, password: PW, email_confirm: true, user_metadata: { full_name: email.split('@')[0] },
+  });
   if (error) throw new Error(`${email}: ${error.message}`);
   if (role) await db.from('profiles').update({ role }).eq('id', data.user.id);
   return data.user.id;
@@ -58,8 +121,15 @@ async function main() {
   const promoterU = await makeUser(EMAILS.promoter, 'cliente');
 
   console.log('criando organização + evento publicado…');
-  const { data: org } = await db.from('organizations').insert({ owner_id: produtora, name: 'Produtora E2E', slug: 'produtora-e2e-' + now.toString(36) }).select('id').single();
-  const { data: ev } = await db.from('events').insert({
+  // Sem checar o erro, uma inserção recusada devolvia data null e o script
+  // morria em "Cannot read properties of null" — que não diz qual passo
+  // quebrou nem por quê. Aqui a falha vem com a mensagem do banco.
+  const { data: org, error: orgErr } = await db.from('organizations')
+    .insert({ owner_id: produtora, name: 'Produtora E2E', slug: 'produtora-e2e-' + now.toString(36) })
+    .select('id').single();
+  if (orgErr || !org) throw new Error(`organização: ${orgErr?.message ?? 'insert não retornou linha'}`);
+
+  const { data: ev, error: evErr } = await db.from('events').insert({
     organization_id: org.id, title: 'Festa E2E', slug: SLUG,
     description: 'Evento de teste ponta a ponta.', venue_name: 'Arena Teste', address: 'Rua 1',
     // 60 dias à frente: a vitrine só lista evento futuro, e uma fixture que
@@ -67,6 +137,7 @@ async function main() {
     // não por defeito no código.
     city: 'São Paulo', state: 'SP', starts_at: iso(now + 60 * 864e5), status: 'published', service_fee_bps: 1000,
   }).select('id').single();
+  if (evErr || !ev) throw new Error(`evento: ${evErr?.message ?? 'insert não retornou linha'}`);
 
   console.log('lotes (inteira/meia)…');
   // Estoque generoso de proposito: a suite compra ingresso a cada execucao e
