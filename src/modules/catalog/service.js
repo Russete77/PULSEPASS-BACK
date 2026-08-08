@@ -82,8 +82,23 @@ export async function getEventBySlug(slug) {
   if (tErr) throw tErr;
 
   const now = Date.now();
+  // A marca vai separada e enxuta: a página pública só precisa do que
+  // desenha o cabeçalho. Devolver a organização inteira exporia campos que
+  // não são da conta de quem está comprando.
+  const { organizations, ...evento } = event;
+  const marca = organizations?.logo_url || organizations?.brand_color
+    ? {
+      nome: organizations.name,
+      logo_url: organizations.logo_url ?? null,
+      cor: organizations.brand_color ?? null,
+      site: organizations.site_url ?? null,
+      instagram: organizations.instagram ?? null,
+    }
+    : null;
+
   return {
-    ...event,
+    ...evento,
+    marca,
     tiers: tiers.map((t) => {
       const available = Math.max(0, t.quantity_total - t.quantity_sold);
       // Estado de venda por janela de datas (virada automática de lote).

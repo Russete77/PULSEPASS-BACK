@@ -393,6 +393,14 @@ paths:
     patch: { tags: [admin], summary: Altera a taxa padrao da plataforma, responses: { "200": { description: alterada } } }
   /platform/billing/orgs/{orgId}/fee:
     patch: { tags: [admin], summary: Define a taxa negociada de uma produtora, parameters: [{ name: orgId, in: path, required: true, schema: { type: string, format: uuid } }], responses: { "200": { description: alterada } } }
+  /admin/organizations/{orgId}/branding:
+    get: { tags: [admin], summary: Marca da produtora (logo, cor, links), parameters: [{ name: orgId, in: path, required: true, schema: { type: string, format: uuid } }], responses: { "200": { description: marca } } }
+    patch: { tags: [admin], summary: Salva a marca da produtora, parameters: [{ name: orgId, in: path, required: true, schema: { type: string, format: uuid } }], responses: { "200": { description: marca salva } } }
+  /admin/organizations/{orgId}/logo-upload:
+    post: { tags: [admin], summary: Autoriza envio do logo (URL assinada do Storage), parameters: [{ name: orgId, in: path, required: true, schema: { type: string, format: uuid } }], responses: { "201": { description: url assinada } } }
+  /admin/organizations/{orgId}/logo:
+    post: { tags: [admin], summary: Confirma o logo enviado, parameters: [{ name: orgId, in: path, required: true, schema: { type: string, format: uuid } }], responses: { "200": { description: marca com o logo } } }
+    delete: { tags: [admin], summary: Remove o logo da produtora, parameters: [{ name: orgId, in: path, required: true, schema: { type: string, format: uuid } }], responses: { "200": { description: removido } } }
   /admin/organizations/{orgId}/asaas-subaccount:
     post: { tags: [admin], summary: Cria a subconta Asaas da produtora (devolve walletId para o split), parameters: [{ name: orgId, in: path, required: true, schema: { type: string, format: uuid } }], responses: { "201": { description: subconta criada }, "409": { description: ja existe } } }
   /admin/organizations/{orgId}/asaas-subaccount/refresh:

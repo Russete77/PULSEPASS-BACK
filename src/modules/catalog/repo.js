@@ -27,7 +27,7 @@ export const findPublishedCities = () =>
 
 export const findPublishedEventBySlug = (slug) =>
   supabase.from('events')
-    .select('id, title, slug, description, cover_url, venue_name, address, city, state, starts_at, ends_at, status, organization_id, service_fee_bps, category, latitude, longitude')
+    .select('id, title, slug, description, cover_url, venue_name, address, city, state, starts_at, ends_at, status, organization_id, service_fee_bps, category, latitude, longitude, organizations(name, slug, logo_url, brand_color, site_url, instagram)')
     .eq('slug', slug).eq('status', 'published').maybeSingle();
 
 export const findTiersByEvent = (eventId) =>

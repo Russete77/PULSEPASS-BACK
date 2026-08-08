@@ -99,6 +99,26 @@ export const publicCoverUrl = (path) =>
 export const removeCover = (paths) =>
   supabase.storage.from('event-covers').remove(paths);
 
+// ── Marca da produtora (white-label) ──
+
+export const findOrgBranding = (orgId) =>
+  supabase.from('organizations')
+    .select('id, name, slug, logo_url, brand_color, site_url, instagram')
+    .eq('id', orgId).maybeSingle();
+
+export const updateOrgBranding = (orgId, patch) =>
+  supabase.from('organizations').update(patch).eq('id', orgId)
+    .select('id, name, slug, logo_url, brand_color, site_url, instagram').single();
+
+export const createLogoUploadUrl = (path) =>
+  supabase.storage.from('org-logos').createSignedUploadUrl(path);
+
+export const publicLogoUrl = (path) =>
+  supabase.storage.from('org-logos').getPublicUrl(path);
+
+export const removeLogo = (paths) =>
+  supabase.storage.from('org-logos').remove(paths);
+
 export const updateEventCover = (eventId, coverUrl) =>
   supabase.from('events').update({ cover_url: coverUrl }).eq('id', eventId)
     .select('id, cover_url').single();

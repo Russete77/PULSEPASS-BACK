@@ -153,3 +153,29 @@ export async function coverConfirm(req, res) {
 export async function coverRemove(req, res) {
   res.json({ data: await service.removeCoverFromEvent({ user: req.user, eventId: req.params.id }) });
 }
+
+// ── Marca da produtora (white-label) ──
+
+export async function brandingGet(req, res) {
+  res.json({ data: await service.getOrgBranding({ user: req.user, orgId: req.params.orgId }) });
+}
+
+export async function brandingPatch(req, res) {
+  res.json({ data: await service.setOrgBranding({ user: req.user, orgId: req.params.orgId, patch: req.body ?? {} }) });
+}
+
+export async function logoUpload(req, res) {
+  res.status(201).json({
+    data: await service.createLogoUpload({
+      user: req.user, orgId: req.params.orgId, contentType: req.body?.content_type,
+    }),
+  });
+}
+
+export async function logoConfirm(req, res) {
+  res.json({ data: await service.confirmLogo({ user: req.user, orgId: req.params.orgId, path: req.body?.path }) });
+}
+
+export async function logoRemove(req, res) {
+  res.json({ data: await service.removeOrgLogo({ user: req.user, orgId: req.params.orgId }) });
+}

@@ -21,6 +21,13 @@ router.use(requireAuth);
 
 router.get('/me', asyncHandler(ctrl.me));
 router.post('/organizations', asyncHandler(ctrl.createOrg));
+// White-label: a marca da produtora na página pública do evento.
+router.get('/organizations/:orgId/branding', asyncHandler(ctrl.brandingGet));
+router.patch('/organizations/:orgId/branding', asyncHandler(ctrl.brandingPatch));
+router.post('/organizations/:orgId/logo-upload', asyncHandler(ctrl.logoUpload));
+router.post('/organizations/:orgId/logo', asyncHandler(ctrl.logoConfirm));
+router.delete('/organizations/:orgId/logo', asyncHandler(ctrl.logoRemove));
+
 router.patch('/organizations/:orgId/asaas-wallet', asyncHandler(ctrl.setOrgWallet));
 // Transparencia do repasse: a produtora precisa conseguir conferir a conta.
 router.get('/organizations/:orgId/repasse', asyncHandler(billingCtrl.transparency));

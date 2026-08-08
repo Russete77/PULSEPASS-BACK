@@ -273,3 +273,103 @@ function extrairCaminho(url) {
   const m = /\/event-covers\/(.+)$/.exec(url);
   return m ? decodeURIComponent(m[1]) : null;
 }
+
+// ═══════════════════ MARCA DA PRODUTORA (WHITE-LABEL) ═══════════════════
+//
+// Casa grande não aceita vender no site de outra marca. Aqui a produtora
+// coloca logo e cor, e a página pública do evento passa a ser dela.
+//
+// O que NÃO muda: rodapé, política e processamento do pagamento seguem sendo
+// do PulsePass. White-label é a marca na frente, não a responsabilidade — e
+// essa distinção precisa ficar visível, para o comprador saber com quem
+// falar se algo der errado.
+
+const LOGO_EXT = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/svg+xml': 'svg' };
+
+export async function getOrgBranding({ user, orgId }) {
+  await assertOrgOwner(user.id, orgId);
+  const { data } = await repo.findOrgBranding(orgId);
+  return data ?? null;
+}
+
+/**
+ * Salva a marca.
+ *
+ * A cor é validada aqui E no banco (CHECK). Duplicar a regra é de propósito:
+ * o CHECK protege contra qualquer caminho que escreva na tabela, e a
+ * validação aqui devolve uma mensagem que a pessoa entende em vez do erro
+ * cru do Postgres.
+ */
+export async function setOrgBranding({ user, orgId, patch }) {
+  await assertOrgOwner(user.id, orgId);
+  const limpo = {};
+
+  if (patch.brand_color !== undefined) {
+    const cor = patch.brand_color?.trim() || null;
+    if (cor && !/^#[0-9A-Fa-f]{6}$/.test(cor)) {
+      throw badRequest('A cor precisa estar no formato #RRGGBB — por exemplo #00FF85.');
+    }
+    limpo.brand_color = cor;
+  }
+  for (const campo of ['site_url', 'instagram']) {
+    if (patch[campo] !== undefined) limpo[campo] = patch[campo]?.trim() || null;
+  }
+  if (patch.site_url) {
+    // Sem protocolo, o link vira relativo e leva para dentro do nosso domínio.
+    if (!/^https?:\/\//i.test(limpo.site_url)) limpo.site_url = `https://${limpo.site_url}`;
+  }
+  if (patch.instagram !== undefined && limpo.instagram) {
+    limpo.instagram = limpo.instagram.replace(/^@+/, '');   // guarda sem arroba
+  }
+
+  const { data, error } = await repo.updateOrgBranding(orgId, limpo);
+  if (error) throw error;
+  return data;
+}
+
+/** Autoriza o envio do logo. O arquivo vai direto ao Storage, como a capa. */
+export async function createLogoUpload({ user, orgId, contentType }) {
+  await assertOrgOwner(user.id, orgId);
+  const ext = LOGO_EXT[contentType];
+  if (!ext) throw badRequest('Formato não aceito. Use PNG, JPG, WebP ou SVG.');
+
+  // Nome novo a cada envio: reaproveitar o mesmo faria o CDN servir o logo
+  // antigo por horas, e a produtora acharia que não subiu.
+  const path = `${orgId}/${Date.now()}.${ext}`;
+  const { data, error } = await repo.createLogoUploadUrl(path);
+  if (error) throw error;
+  return { path, signed_url: data.signedUrl, token: data.token };
+}
+
+export async function confirmLogo({ user, orgId, path }) {
+  await assertOrgOwner(user.id, orgId);
+  // O caminho precisa ser desta organização — senão bastaria informar o de
+  // outra produtora para roubar o logo dela.
+  if (!String(path).startsWith(`${orgId}/`)) throw badRequest('Caminho inválido para esta organização');
+
+  const { data: antes } = await repo.findOrgBranding(orgId);
+  const { data: pub } = repo.publicLogoUrl(path);
+  const { data, error } = await repo.updateOrgBranding(orgId, { logo_url: pub.publicUrl });
+  if (error) throw error;
+
+  const antigo = extrairCaminhoLogo(antes?.logo_url);
+  if (antigo && antigo !== path) {
+    repo.removeLogo([antigo]).catch((e) => logger.warn('logo: falha ao remover o anterior', { error: e.message }));
+  }
+  return data;
+}
+
+export async function removeOrgLogo({ user, orgId }) {
+  await assertOrgOwner(user.id, orgId);
+  const { data: antes } = await repo.findOrgBranding(orgId);
+  const caminho = extrairCaminhoLogo(antes?.logo_url);
+  const { data } = await repo.updateOrgBranding(orgId, { logo_url: null });
+  if (caminho) repo.removeLogo([caminho]).catch(() => { /* lixo pago, não trava */ });
+  return data;
+}
+
+function extrairCaminhoLogo(url) {
+  if (!url) return null;
+  const m = /\/org-logos\/(.+)$/.exec(url);
+  return m ? decodeURIComponent(m[1]) : null;
+}
