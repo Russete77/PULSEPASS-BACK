@@ -104,11 +104,20 @@ jobs:
       # commits enquanto a API não subia DENTRO dela — o supabase-js passou a
       # exigir Node 22 (WebSocket nativo) e o Dockerfile estava em node:20.
       # Build que nunca roda o que construiu não prova nada.
+      # A imagem roda com NODE_ENV=production, entao as travas de producao
+      # valem aqui: webhook sem token seria fail-open, e QR sem segredo forte
+      # deixaria forjar ingresso. Os valores abaixo sao descartaveis e servem
+      # so pra provar que a API SOBE — nenhum deles toca serviço externo.
+      # Se uma trava nova entrar em env.js, este passo quebra, que e o certo.
       - name: A API sobe DENTRO da imagem?
         run: |
           docker run -d --name pp-ci -p 4000:4000 \
             -e SUPABASE_URL=https://example.supabase.co \
             -e SUPABASE_SERVICE_ROLE_KEY=dummy-para-boot \
+            -e ASAAS_WEBHOOK_TOKEN=ci-smoke-token \
+            -e ASAAS_BASE_URL=https://api.asaas.com/v3 \
+            -e ASAAS_API_KEY=ci-smoke-key-descartavel \
+            -e TICKET_QR_SECRET=ci-smoke-qr-secret-descartavel \
             pulsepass-api:ci
           for i in $(seq 1 20); do
             if curl -fsS http://localhost:4000/api/health >/dev/null 2>&1; then
