@@ -1,7 +1,7 @@
 # PulsePass API — imagem de produção (repositório standalone).
 #   docker build -t pulsepass-api .
 #   docker run -p 4000:4000 --env-file .env pulsepass-api
-FROM node:20-alpine
+FROM node:22-alpine
 WORKDIR /app
 ENV NODE_ENV=production
 

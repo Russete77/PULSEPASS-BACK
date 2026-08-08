@@ -5,7 +5,7 @@
   "type": "module",
   "description": "PulsePass — backend único (ticketing + guest list + cashless). Express 5 + Supabase + Asaas.",
   "engines": {
-    "node": ">=20.19.0"
+    "node": ">=22.0.0"
   },
   "scripts": {
     "dev": "node --watch src/server.js",

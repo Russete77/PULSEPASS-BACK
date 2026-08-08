@@ -12,7 +12,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
       - name: Install
         run: npm ci
@@ -50,7 +50,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
       - name: Install
         run: npm ci
@@ -99,3 +99,26 @@ jobs:
       - uses: actions/checkout@v4
       - name: Build da imagem
         run: docker build -t pulsepass-api:ci .
+
+      # Só construir dava confiança falsa: a imagem vinha compilando verde há
+      # commits enquanto a API não subia DENTRO dela — o supabase-js passou a
+      # exigir Node 22 (WebSocket nativo) e o Dockerfile estava em node:20.
+      # Build que nunca roda o que construiu não prova nada.
+      - name: A API sobe DENTRO da imagem?
+        run: |
+          docker run -d --name pp-ci -p 4000:4000 \
+            -e SUPABASE_URL=https://example.supabase.co \
+            -e SUPABASE_SERVICE_ROLE_KEY=dummy-para-boot \
+            pulsepass-api:ci
+          for i in $(seq 1 20); do
+            if curl -fsS http://localhost:4000/api/health >/dev/null 2>&1; then
+              echo "✓ a API respondeu em /api/health"
+              docker rm -f pp-ci >/dev/null
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "✖ a API não respondeu em 20s. Log do contêiner:"
+          docker logs pp-ci
+          docker rm -f pp-ci >/dev/null
+          exit 1
