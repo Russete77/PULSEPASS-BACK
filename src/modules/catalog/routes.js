@@ -3,6 +3,8 @@ import { Router } from 'express';
 import { asyncHandler } from '../../middleware/asyncHandler.js';
 import * as ctrl from './controller.js';
 import * as waitlist from '../waitlist/controller.js';
+import * as seats from '../seats/controller.js';
+import { optionalAuth, requireAuth } from '../../middleware/auth.js';
 
 const router = Router();
 
@@ -11,6 +13,12 @@ router.get('/', asyncHandler(ctrl.list));
 router.get('/cidades', asyncHandler(ctrl.cities));
 router.get('/:slug', asyncHandler(ctrl.detail));
 router.get('/:slug/menu', asyncHandler(ctrl.menu));
+// Mapa de assentos. Auth OPCIONAL: sem login o mapa aparece igual, só não
+// marca quais lugares são seus — e ver antes de criar conta é o que faz a
+// pessoa decidir criar.
+router.get('/:slug/assentos', optionalAuth, asyncHandler(seats.map));
+router.post('/:slug/assentos/reservar', requireAuth, asyncHandler(seats.hold));
+router.post('/:slug/assentos/soltar', requireAuth, asyncHandler(seats.release));
 // Fila de espera de lote esgotado (público: quem quis comprar fica registrado)
 router.post('/:slug/waitlist', asyncHandler(waitlist.join));
 

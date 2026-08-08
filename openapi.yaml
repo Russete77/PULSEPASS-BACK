@@ -129,6 +129,12 @@ paths:
       summary: Detalhe do evento + lotes
       parameters: [{ name: slug, in: path, required: true, schema: { type: string } }]
       responses: { "200": { description: evento }, "404": { description: não encontrado } }
+  /events/{slug}/assentos:
+    get: { tags: [catalog], summary: Mapa de assentos (publico; com login marca os seus), parameters: [{ name: slug, in: path, required: true, schema: { type: string } }], responses: { "200": { description: setores, fileiras e assentos } } }
+  /events/{slug}/assentos/reservar:
+    post: { tags: [catalog], summary: Reserva assentos por 8 minutos, parameters: [{ name: slug, in: path, required: true, schema: { type: string } }], responses: { "200": { description: reservados }, "409": { description: alguem pegou antes } } }
+  /events/{slug}/assentos/soltar:
+    post: { tags: [catalog], summary: Solta os assentos que voce segurava, parameters: [{ name: slug, in: path, required: true, schema: { type: string } }], responses: { "200": { description: soltos } } }
   /events/{slug}/menu:
     get:
       tags: [catalog]
@@ -432,6 +438,8 @@ paths:
     get: { tags: [admin], summary: Fechamento do caixa da bilheteria (por forma e operador), parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }], responses: { "200": { description: fechamento } } }
   /admin/events/{id}/ledger-check:
     get: { tags: [admin], summary: Integridade do ledger (drift de saldo), parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }], responses: { "200": { description: resultado } } }
+  /admin/events/{id}/assentos:
+    post: { tags: [admin], summary: Gera a grade de assentos de um setor (fileiras x assentos), parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }], responses: { "201": { description: assentos criados } } }
   /admin/events/{id}/reconciliation:
     get: { tags: [admin], summary: Conciliacao de pagamentos, parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }], responses: { "200": { description: conciliacao } } }
   /admin/events/{id}/guests:

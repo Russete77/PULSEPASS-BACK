@@ -15,6 +15,7 @@ import * as fiscal from '../fiscal/controller.js';
 import * as auditCtrl from '../audit/controller.js';
 import * as billingCtrl from '../billing/controller.js';
 import * as waitlistCtrl from '../waitlist/controller.js';
+import * as seatsCtrl from '../seats/controller.js';
 
 const router = Router();
 router.use(requireAuth);
@@ -44,6 +45,9 @@ router.get('/events/:id/dashboard', asyncHandler(ctrl.dashboard));
 router.post('/events/:id/cover-upload', asyncHandler(ctrl.coverUpload));
 router.post('/events/:id/cover', asyncHandler(ctrl.coverConfirm));
 router.delete('/events/:id/cover', asyncHandler(ctrl.coverRemove));
+// Assento marcado: a produtora gera a grade do setor (fileiras x assentos).
+router.post('/events/:id/assentos', asyncHandler(seatsCtrl.generate));
+
 router.get('/events/:id/reconciliation', asyncHandler(ctrl.reconciliation));
 
 // Equipe do evento (RBAC) — manager / door / bar
