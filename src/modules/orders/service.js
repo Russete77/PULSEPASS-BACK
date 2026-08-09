@@ -29,7 +29,7 @@ function applyDiscount(totalCents, kind, value) {
 }
 
 export async function createOrder({
-  user, profile, items, eventSlug, couponCode,
+  user, profile, items, eventSlug, couponCode, seatIds = null,
   paymentMethod = 'pix', installmentCount, card, holderInfo, remoteIp,
   idempotencyKey = null,
 }) {
@@ -83,6 +83,22 @@ export async function createOrder({
   await repo.setOrderFee(orderId, Math.round(feePercent * 100));
 
   try {
+    // 1.4) assentos marcados — antes de qualquer cobrança.
+    //
+    // Vem primeiro de propósito: se a reserva de 8 minutos venceu enquanto a
+    // pessoa preenchia o cartão, é melhor recusar aqui do que cobrar e só
+    // então descobrir que a poltrona é de outro. O catch abaixo desfaz o
+    // pedido pendente e devolve o estoque.
+    if (Array.isArray(seatIds) && seatIds.length) {
+      const { error: sErr } = await repo.rpcVincularAssentos({ orderId, userId: user.id, seatIds });
+      if (sErr) {
+        if (/RESERVA_EXPIRADA_OU_ALHEIA/.test(sErr.message)) {
+          throw conflict('A reserva dos assentos expirou. Volte ao mapa e escolha de novo.');
+        }
+        throw sErr;
+      }
+    }
+
     // 1.5) cupom (redenção atômica) — ajusta o total a cobrar
     if (couponCode) {
       const { data: red, error: cErr } = await repo.rpcRedeemCoupon(event.id, couponCode);
@@ -163,9 +179,19 @@ export async function createOrder({
       pix: { payload: qr.payload, qr_base64: qr.encodedImage, expiration: qr.expirationDate },
     };
   } catch (err) {
-    // libera o estoque cedo (além do expiry)
-    await repo.cancelPendingOrder(orderId);
-    await repo.rpcExpirePending().catch(() => {});
+    // Libera o estoque cedo, sem esperar o expiry.
+    //
+    // A limpeza vai no próprio try. O builder do Supabase não expõe `.catch`,
+    // então `rpcExpirePending().catch(...)` lançava TypeError AQUI DENTRO, e
+    // esse erro substituía o original. Na prática toda falha de checkout
+    // chegava ao cliente como "Falha ao gerar cobrança" — inclusive as que
+    // tinham mensagem própria: cupom inválido, lote esgotado, reserva de
+    // assento vencida. O motivo real nunca saía do servidor.
+    try {
+      await repo.cancelPendingOrder(orderId);
+      await repo.rpcExpirePending();
+    } catch { /* best-effort; o expiry automático cobre o que sobrar */ }
+
     if (err instanceof ApiError) throw err;
     throw new ApiError(502, 'Falha ao gerar cobrança. Tente novamente.');
   }

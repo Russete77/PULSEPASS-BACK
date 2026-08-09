@@ -13,6 +13,9 @@ const createSchema = z.object({
     half: z.boolean().optional(), // meia-entrada
   })).min(1),
   couponCode: z.string().min(1).optional(),
+  // Assentos escolhidos no mapa. Opcional: evento de pista não tem lugar
+  // marcado, e a maioria dos eventos é de pista.
+  seat_ids: z.array(z.string().uuid()).max(10).optional(),
   paymentMethod: z.enum(['pix', 'card']).optional(),
   installmentCount: z.number().int().min(1).max(12).optional(),
   card: z.object({
@@ -42,6 +45,7 @@ export async function create(req, res) {
     paymentMethod: parsed.data.paymentMethod ?? 'pix',
     installmentCount: parsed.data.installmentCount,
     card: parsed.data.card, holderInfo: parsed.data.holderInfo,
+    seatIds: parsed.data.seat_ids ?? null,
     remoteIp: req.ip, idempotencyKey: req.headers['idempotency-key'] || null,
   });
   res.status(201).json({ data: order });

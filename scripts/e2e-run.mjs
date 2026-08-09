@@ -38,6 +38,7 @@ const SUITES = [
   ['billing', 'split e taxa da plataforma'],
   ['subaccount', 'subcontas Asaas'],
   ['cover', 'capa do evento'],
+  ['seats', 'assento marcado e reserva temporária'],
 ];
 
 const PORTA = Number(process.env.PORT || 4000);

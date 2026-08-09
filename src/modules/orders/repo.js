@@ -19,6 +19,12 @@ export const rpcPlaceOrder = ({ buyerId, eventId, items, idempotencyKey }) =>
     p_idempotency_key: idempotencyKey,
   });
 
+/** Liga ao pedido os assentos que a pessoa está segurando. */
+export const rpcVincularAssentos = ({ orderId, userId, seatIds }) =>
+  supabase.rpc('vincular_assentos_ao_pedido', {
+    p_order: orderId, p_user: userId, p_seats: seatIds,
+  });
+
 export const rpcRedeemCoupon = (eventId, code) =>
   supabase.rpc('redeem_coupon', { p_event: eventId, p_code: code });
 
