@@ -75,7 +75,7 @@ export async function setReservationStatus({ user, reservationId, status, ocasia
   if (!r) throw notFound('Reserva não encontrada');
   // Papel 'bar' entra aqui: quem recebe a mesa no salão não é gerente, e
   // exigir gerência para marcar chegada faria a produtora emprestar a conta.
-  await assertEventAccess(user.id, r.event_id, ['bar', 'manager']);
+  await assertEventAccess(user.id, r.event_id, ['bar', 'manager'], 'tables:manage');
 
   const patch = { status };
   // Carimbo junto do status, na mesma linha. Separados, uma falha entre os

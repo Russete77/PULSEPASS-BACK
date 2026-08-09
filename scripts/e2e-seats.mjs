@@ -130,6 +130,19 @@ async function main() {
   check('desvinculados do pedido', (soltos ?? []).every((s) => !s.order_id && !s.held_by),
     'o gatilho cuida disso, não a aplicação');
 
+  console.log('\n7.5) Assentos e ingressos precisam bater');
+  // Sem esta checagem dava para reservar duas poltronas e comprar UM ingresso
+  // — a segunda ficaria vendida sem ninguém para sentar nela — ou comprar
+  // cinco ingressos com duas poltronas, e três pessoas chegariam sem lugar.
+  await api('POST', '/events/festa-e2e/assentos/reservar', { token: cliente, body: { seat_ids: alvo } });
+  const desalinhado = await api('POST', '/orders', {
+    token: cliente,
+    body: { eventSlug: 'festa-e2e', items: [{ ticket_tier_id: lote.id, quantity: 1 }], seat_ids: alvo },
+  });
+  check('2 lugares com 1 ingresso é RECUSADO', desalinhado.status === 400,
+    desalinhado.body?.error?.message?.slice(0, 46));
+  await api('POST', '/events/festa-e2e/assentos/soltar', { token: cliente });
+
   console.log('\n8) Quem não é da produtora não gera grade');
   const intruso = await api('POST', `/admin/events/${ev.id}/assentos`, {
     token: cliente, body: { setor: 'Pirata', tier_id: lote.id, fileiras: 2, por_fileira: 2 },

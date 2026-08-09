@@ -90,6 +90,22 @@ export async function createOrder({
     // então descobrir que a poltrona é de outro. O catch abaixo desfaz o
     // pedido pendente e devolve o estoque.
     if (Array.isArray(seatIds) && seatIds.length) {
+      // A conta tem que fechar: um assento por ingresso.
+      //
+      // Sem esta checagem dava para reservar duas poltronas e comprar um
+      // ingresso — a segunda ficaria vendida sem ninguém para sentar nela — ou
+      // comprar cinco ingressos com duas poltronas, e três pessoas chegariam
+      // na casa sem lugar. A tela de assentos não amarra isso porque a
+      // quantidade é escolhida na página do evento, em outro passo.
+      const ingressos = items.reduce((s, i) => s + (Number(i.quantity) || 0), 0);
+      if (ingressos !== seatIds.length) {
+        throw badRequest(
+          `Você escolheu ${seatIds.length} ${seatIds.length === 1 ? 'lugar' : 'lugares'} `
+          + `e ${ingressos} ${ingressos === 1 ? 'ingresso' : 'ingressos'}. `
+          + 'Em evento com lugar marcado os dois números precisam bater.',
+        );
+      }
+
       const { error: sErr } = await repo.rpcVincularAssentos({ orderId, userId: user.id, seatIds });
       if (sErr) {
         if (/RESERVA_EXPIRADA_OU_ALHEIA/.test(sErr.message)) {

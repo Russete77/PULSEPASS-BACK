@@ -291,7 +291,7 @@ function minutosDesde(iso) {
  * controle de acesso se perde na noite do evento.
  */
 export async function getKitchenQueue({ user, eventId }) {
-  await assertEventAccess(user.id, eventId, ['bar', 'manager']);
+  await assertEventAccess(user.id, eventId, ['bar', 'manager'], 'bar:kds');
   const { data, error } = await repo.findKitchenQueue(eventId);
   if (error) throw error;
 
@@ -324,7 +324,7 @@ export async function advanceBarOrder({ user, orderId, para, station = null }) {
 
   const { data: pedido } = await repo.findBarOrderEvent(orderId);
   if (!pedido) throw notFound('Pedido não encontrado');
-  await assertEventAccess(user.id, pedido.event_id, ['bar', 'manager']);
+  await assertEventAccess(user.id, pedido.event_id, ['bar', 'manager'], 'bar:kds');
 
   const { data, error } = await repo.rpcAdvanceBarOrder({
     orderId, para, operadorId: user.id, station,
@@ -348,7 +348,7 @@ export async function advanceBarOrder({ user, orderId, para, station = null }) {
  * poucos segundos. São duas consultas e o agrupamento acontece aqui.
  */
 export async function getWaiterBoard({ user, eventId }) {
-  await assertEventAccess(user.id, eventId, ['bar', 'manager']);
+  await assertEventAccess(user.id, eventId, ['bar', 'manager'], 'bar:waiter');
   const [{ data: mesas }, { data: pedidos }] = await Promise.all([
     repo.findActiveTables(eventId),
     repo.findOpenOrdersByTable(eventId),
