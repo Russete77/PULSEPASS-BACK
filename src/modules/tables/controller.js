@@ -48,5 +48,5 @@ export async function adminReservations(req, res) {
   res.json({ data: await service.listReservations({ user: req.user, eventId: req.params.id }) });
 }
 export async function adminSetReservation(req, res) {
-  res.json({ data: await service.setReservationStatus({ user: req.user, reservationId: req.params.reservationId, status: req.body?.status }) });
+  res.json({ data: await service.setReservationStatus({ user: req.user, reservationId: req.params.reservationId, status: req.body?.status, ocasiao: req.body?.ocasiao }) });
 }

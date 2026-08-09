@@ -31,11 +31,11 @@ export const adminDeleteTable = (tableId) => supabase.from('event_tables').delet
 
 export const adminListReservations = (eventId) =>
   supabase.from('table_reservations')
-    .select('id, name, contact, party_size, status, created_at, event_tables(name, area)')
+    .select('id, name, contact, party_size, status, notes, ocasiao, seated_at, left_at, created_at, event_tables(name, area, capacity)')
     .eq('event_id', eventId).order('created_at', { ascending: false });
 
 export const findReservationEvent = (reservationId) =>
   supabase.from('table_reservations').select('id, event_id').eq('id', reservationId).maybeSingle();
 
-export const updateReservationStatus = (reservationId, status) =>
-  supabase.from('table_reservations').update({ status }).eq('id', reservationId).select('id, status').single();
+export const updateReservationStatus = (reservationId, patch) =>
+  supabase.from('table_reservations').update(patch).eq('id', reservationId).select().single();

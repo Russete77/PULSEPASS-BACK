@@ -3,7 +3,7 @@ import { notFound, badRequest } from '../../utils/ApiError.js';
 import { assertEventAccess } from '../identity/access.js';
 import * as repo from './repo.js';
 
-const STATUSES = ['requested', 'confirmed', 'rejected', 'cancelled'];
+const STATUSES = ['requested', 'confirmed', 'seated', 'rejected', 'cancelled'];
 
 /* ── PÚBLICO ── */
 export async function listPublicTables(slug) {
@@ -69,12 +69,24 @@ export async function listReservations({ user, eventId }) {
   return data ?? [];
 }
 
-export async function setReservationStatus({ user, reservationId, status }) {
+export async function setReservationStatus({ user, reservationId, status, ocasiao }) {
   if (!STATUSES.includes(status)) throw badRequest('Status inválido');
   const { data: r } = await repo.findReservationEvent(reservationId);
   if (!r) throw notFound('Reserva não encontrada');
-  await assertEventAccess(user.id, r.event_id, ['manager']);
-  const { data, error } = await repo.updateReservationStatus(reservationId, status);
+  // Papel 'bar' entra aqui: quem recebe a mesa no salão não é gerente, e
+  // exigir gerência para marcar chegada faria a produtora emprestar a conta.
+  await assertEventAccess(user.id, r.event_id, ['bar', 'manager']);
+
+  const patch = { status };
+  // Carimbo junto do status, na mesma linha. Separados, uma falha entre os
+  // dois deixaria mesa 'seated' sem hora de chegada — e o tempo de ocupação,
+  // que é o número que o gerente lê, ficaria errado o resto da noite.
+  if (status === 'seated') patch.seated_at = new Date().toISOString();
+  // Sair da mesa é qualquer estado final: cancelou, foi embora, foi rejeitada.
+  if (['cancelled', 'rejected'].includes(status)) patch.left_at = new Date().toISOString();
+  if (ocasiao !== undefined) patch.ocasiao = ocasiao?.trim() || null;
+
+  const { data, error } = await repo.updateReservationStatus(reservationId, patch);
   if (error) throw error;
   return data;
 }
