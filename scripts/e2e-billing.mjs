@@ -95,6 +95,38 @@ async function main() {
     .select('platform_fee_bps').eq('id', compra2.data.id).single();
   check('venda nova já usa a taxa nova', pedido2.platform_fee_bps === 1500, `${pedido2.platform_fee_bps} bps`);
 
+  // Paga o pedido: garante ao menos UMA venda paga com bps congelado, para a
+  // conciliação abaixo ter o que somar mesmo com a suíte rodando sozinha.
+  await api('POST', `/orders/${compra2.data.id}/simulate-paid`, { token: cliente });
+
+  console.log('\n4.5) A conciliação cobra a taxa CONGELADA, pedido a pedido');
+  // Regressão do bug que passou anos invisível: a conciliação lia a taxa de
+  // uma variável de ambiente que não existia e informava 0% — a produtora
+  // fechava a noite achando que recebia o bruto. E ainda subtraía estorno de
+  // uma soma da qual o estornado já tinha saído.
+  const conc = await api('GET', `/admin/events/${ev.id}/reconciliation`, { token: admin });
+  check('conciliação responde', conc.status === 200);
+  check('a taxa NÃO é zero', (conc.data?.platform_fee_cents ?? 0) > 0,
+    `${conc.data?.platform_fee_cents} centavos de taxa`);
+  check('repasse = líquido − taxa',
+    conc.data?.producer_net_cents === conc.data?.net_sales_cents - conc.data?.platform_fee_cents,
+    'sem esse fecho os três números não se sustentam');
+  // Pedido estornado já saiu da soma de vendas pagas: o líquido é o bruto
+  // pago, sem subtrair o estorno DE NOVO.
+  check('estorno não é descontado duas vezes',
+    conc.data?.net_sales_cents === conc.data?.tickets_gross_cents,
+    `líquido ${conc.data?.net_sales_cents} = bruto pago ${conc.data?.tickets_gross_cents}`);
+  // Prova forte: refaz a soma pedido a pedido com o bps congelado em cada um.
+  // Pedido anterior à 0037 (bps nulo) cai na taxa efetiva — 1500, definida na
+  // seção 4 logo acima.
+  const { data: pagosConc } = await db.from('orders')
+    .select('total_cents, platform_fee_bps').eq('event_id', ev.id).eq('status', 'paid');
+  const esperadoConc = (pagosConc ?? []).reduce(
+    (s, o) => s + Math.round((o.total_cents * (o.platform_fee_bps ?? 1500)) / 10000), 0);
+  check('taxa = soma pedido a pedido com o bps de cada venda',
+    conc.data?.platform_fee_cents === esperadoConc,
+    `${conc.data?.platform_fee_cents} = ${esperadoConc}`);
+
   console.log('\n5) Mudança de taxa fica na trilha de auditoria');
   const { data: trilha } = await db.from('audit_log')
     .select('action, before, after').eq('action', 'platform.org_fee_change')

@@ -1,6 +1,5 @@
 // modules/identity/service.js — perfil, organização, gestão de eventos e equipe (RBAC).
 import { notFound, forbidden, badRequest } from '../../utils/ApiError.js';
-import { env } from '../../config/env.js';
 import { logger } from '../../lib/logger.js';
 import { assertEventAccess } from './access.js';
 import * as repo from './repo.js';
@@ -166,15 +165,19 @@ export async function getReconciliation({ user, eventId }) {
   const { data, error } = await repo.rpcEventReconciliation(eventId);
   if (error) throw error;
 
-  const feePct = Number(env.asaas.platformFeePercent) || 0;
-  const netSales = (data.tickets_gross_cents || 0) - (data.refunds_cents || 0);
-  const platformFee = Math.round((netSales * feePct) / 100);
+  // A taxa vem somada da RPC, pedido a pedido, usando o bps CONGELADO em cada
+  // venda (0037/0050). Recalcular aqui com um percentual do ambiente era o bug:
+  // sem a variável definida, a tela informava 0% de taxa e repasse cheio — e o
+  // líquido ainda descontava estorno duas vezes, porque pedido estornado já
+  // não está na soma de vendas pagas.
+  const bpsMin = data.fee_bps_min ?? 0;
+  const bpsMax = data.fee_bps_max ?? 0;
   return {
     ...data,
-    platform_fee_percent: feePct,
-    net_sales_cents: netSales,
-    platform_fee_cents: platformFee,
-    producer_net_cents: netSales - platformFee,
+    // Um número quando a taxa foi uma só; a faixa quando mudou no meio.
+    platform_fee_percent: bpsMin === bpsMax
+      ? bpsMax / 100
+      : `${bpsMin / 100}–${bpsMax / 100}`,
   };
 }
 
