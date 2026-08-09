@@ -198,6 +198,13 @@ export async function updateMenuItem({ user, itemId, patch }) {
   if (patch.description !== undefined) clean.description = patch.description || null;
   if (patch.available != null) clean.available = Boolean(patch.available);
   if (patch.stock !== undefined) clean.stock = patch.stock != null ? Math.max(0, Math.round(Number(patch.stock))) : null;
+  // Custo faltava nesta lista branca: dava para criar item COM custo e nunca
+  // mais corrigi-lo pela tela. `!== undefined` e não `!= null` porque enviar
+  // null aqui é a forma de LIMPAR o custo, e isso precisa passar.
+  if (patch.cost_cents !== undefined) {
+    clean.cost_cents = patch.cost_cents != null && patch.cost_cents !== ''
+      ? Math.max(0, Math.round(Number(patch.cost_cents))) : null;
+  }
   const { data, error } = await repo.adminUpdateMenuItem(itemId, clean);
   if (error) throw error;
   return data;
