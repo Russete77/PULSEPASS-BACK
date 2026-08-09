@@ -113,6 +113,8 @@ const menuItemSchema = z.object({
   name: z.string().min(1),
   category: z.string().optional(),
   price_cents: z.number().int().nonnegative(),
+  // Custo é opcional: sem ele a margem some da tela em vez de ser inventada.
+  cost_cents: z.number().int().nonnegative().nullable().optional(),
   description: z.string().optional(),
   available: z.boolean().optional(),
   stock: z.number().int().nonnegative().nullable().optional(),
@@ -175,4 +177,46 @@ export async function waiterOrder(req, res) {
       idempotencyKey: req.get('Idempotency-Key') ?? null,
     }),
   });
+}
+
+
+// ── Turno de caixa ──
+
+const abrirTurnoSchema = z.object({
+  fundo_cents: z.number().int().min(0).max(10_000_00).optional(),
+  station: z.string().max(60).optional(),
+});
+const fecharTurnoSchema = z.object({
+  contado_cents: z.number().int().min(0),
+  notas: z.string().max(300).optional(),
+});
+
+export async function turnoAberto(req, res) {
+  res.json({ data: await service.getTurnoAberto({ user: req.user, eventId: req.params.id }) });
+}
+
+export async function turnoAbrir(req, res) {
+  const p = abrirTurnoSchema.safeParse(req.body ?? {});
+  if (!p.success) throw badRequest('Payload inválido', p.error.flatten());
+  res.status(201).json({
+    data: await service.abrirTurno({
+      user: req.user, eventId: req.params.id,
+      fundoCents: p.data.fundo_cents ?? 0, station: p.data.station ?? null,
+    }),
+  });
+}
+
+export async function turnoFechar(req, res) {
+  const p = fecharTurnoSchema.safeParse(req.body ?? {});
+  if (!p.success) throw badRequest('Payload inválido', p.error.flatten());
+  res.json({
+    data: await service.fecharTurno({
+      user: req.user, turnoId: req.params.turnoId,
+      contadoCents: p.data.contado_cents, notas: p.data.notas ?? null,
+    }),
+  });
+}
+
+export async function turnosList(req, res) {
+  res.json({ data: await service.listarTurnos({ user: req.user, eventId: req.params.id }) });
 }

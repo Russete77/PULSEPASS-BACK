@@ -170,6 +170,10 @@ export async function createMenuItem({ user, eventId, item }) {
   const { data, error } = await repo.adminInsertMenuItem({
     event_id: eventId, name: item.name, category: item.category || 'Geral',
     price_cents: Math.max(0, Math.round(Number(item.price_cents) || 0)),
+    // Custo é opcional. Nulo mantém a margem fora da tela em vez de fingir
+    // 100% de lucro, que seria a mentira mais confortável possível.
+    cost_cents: item.cost_cents != null && item.cost_cents !== ''
+      ? Math.max(0, Math.round(Number(item.cost_cents))) : null,
     description: item.description || null,
     available: item.available !== false,
     stock: item.stock != null ? Math.max(0, Math.round(Number(item.stock))) : null,
@@ -408,4 +412,90 @@ export async function reverseTopupByPaymentId(asaasPaymentId, kind, reason = nul
   const { data, error } = await repo.rpcReverseTopup(asaasPaymentId, kind, reason);
   if (error) throw error;
   return data;
+}
+
+// ═══════════════════ TURNO DE CAIXA ═══════════════════
+//
+// O caixa nunca ABRIA. Existia o relatório por operador, mas não o turno:
+// sem hora de abertura e sem fundo de troco, "sobrou R$ 300 na gaveta" não
+// quer dizer nada — não há com o que comparar.
+
+/** O turno aberto de quem está operando agora, se houver. */
+export async function getTurnoAberto({ user, eventId }) {
+  await assertEventAccess(user.id, eventId, ['bar', 'manager']);
+  const { data } = await repo.findTurnoAberto(eventId, user.id);
+  return data ?? null;
+}
+
+export async function abrirTurno({ user, eventId, fundoCents = 0, station = null }) {
+  await assertEventAccess(user.id, eventId, ['bar', 'manager']);
+  const fundo = Math.max(0, Math.round(Number(fundoCents) || 0));
+
+  const { data, error } = await repo.abrirTurno({
+    event_id: eventId, operator_id: user.id, opening_cents: fundo, station,
+  });
+  if (error) {
+    // O índice único garante um turno aberto por operador. Dois toques no
+    // botão abririam duas gavetas, e a conferência do fim da noite nunca
+    // fecharia.
+    if (/duplicate key|uq_turno_aberto/.test(error.message)) {
+      throw conflict('Você já tem um turno aberto neste evento. Feche o anterior antes de abrir outro.');
+    }
+    throw error;
+  }
+  return data;
+}
+
+/**
+ * Fecha e confere.
+ *
+ * O que o operador CONTOU fica separado do que o sistema calcula, de
+ * propósito: a diferença entre os dois é justamente o achado da conferência.
+ */
+export async function fecharTurno({ user, turnoId, contadoCents, notas = null }) {
+  const { data: turno } = await repo.findTurnoEvento(turnoId);
+  if (!turno) throw notFound('Turno não encontrado');
+  await assertEventAccess(user.id, turno.event_id, ['bar', 'manager']);
+  // Gerente fecha o turno de qualquer um; operador só o próprio. Sem isso,
+  // um barman fecharia a gaveta do colega e a responsabilidade se perderia.
+  if (turno.operator_id !== user.id) {
+    await assertEventAccess(user.id, turno.event_id, ['manager']);
+  }
+  if (contadoCents == null || Number.isNaN(Number(contadoCents))) {
+    throw badRequest('Informe quanto foi contado na gaveta');
+  }
+
+  const { data, error } = await repo.rpcFecharTurno({
+    turnoId, contado: Math.max(0, Math.round(Number(contadoCents))), notas,
+  });
+  if (error) {
+    if (/TURNO_JA_FECHADO/.test(error.message)) throw conflict('Este turno já foi fechado.');
+    throw error;
+  }
+  const r = Array.isArray(data) ? data[0] : data;
+  return {
+    esperado_cents: r.esperado_cents,
+    contado_cents: r.contado_cents,
+    diferenca_cents: r.diferenca_cents,
+    vendas_cents: r.vendas_cents,
+    fundo_cents: r.fundo_cents,
+    // Quebra de caixa é o nome que a operação usa. Negativo = faltou.
+    veredito: r.diferenca_cents === 0 ? 'bateu' : r.diferenca_cents > 0 ? 'sobrou' : 'faltou',
+  };
+}
+
+export async function listarTurnos({ user, eventId }) {
+  await assertEventAccess(user.id, eventId, ['manager']);
+  const { data, error } = await repo.findTurnosDoEvento(eventId);
+  if (error) throw error;
+  return (data ?? []).map((t) => ({
+    id: t.id,
+    operador: t.profiles?.full_name || t.profiles?.email || '—',
+    praca: t.station,
+    fundo_cents: t.opening_cents,
+    contado_cents: t.counted_cents,
+    aberto_em: t.opened_at,
+    fechado_em: t.closed_at,
+    notas: t.notes,
+  }));
 }

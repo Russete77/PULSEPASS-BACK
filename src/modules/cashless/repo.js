@@ -53,7 +53,7 @@ export const findAvailableMenu = (eventId) =>
 // Gestão de cardápio (produtor)
 export const adminListMenu = (eventId) =>
   supabase.from('menu_items')
-    .select('id, name, description, category, price_cents, image_url, available, position, stock')
+    .select('id, name, description, category, price_cents, cost_cents, image_url, available, position, stock')
     .eq('event_id', eventId).order('position', { ascending: true });
 
 export const adminInsertMenuItem = (row) => supabase.from('menu_items').insert(row).select().single();
@@ -139,3 +139,25 @@ export const findMyBarOrders = (userId, { limit = 50, offset = 0 } = {}) =>
   supabase.from('bar_orders')
     .select('id, status, total_cents, pickup_code, created_at, events(title), bar_order_items(name, quantity)')
     .eq('buyer_id', userId).order('created_at', { ascending: false }).range(offset, offset + limit - 1);
+
+// ── Turno de caixa ──
+
+export const findTurnoAberto = (eventId, operatorId) =>
+  supabase.from('cashier_shifts')
+    .select('id, station, opening_cents, opened_at')
+    .eq('event_id', eventId).eq('operator_id', operatorId).is('closed_at', null)
+    .maybeSingle();
+
+export const abrirTurno = (row) =>
+  supabase.from('cashier_shifts').insert(row).select().single();
+
+export const rpcFecharTurno = ({ turnoId, contado, notas }) =>
+  supabase.rpc('fechar_turno', { p_turno: turnoId, p_contado: contado, p_notas: notas });
+
+export const findTurnosDoEvento = (eventId) =>
+  supabase.from('cashier_shifts')
+    .select('id, station, opening_cents, counted_cents, opened_at, closed_at, notes, profiles:operator_id (full_name, email)')
+    .eq('event_id', eventId).order('opened_at', { ascending: false }).limit(50);
+
+export const findTurnoEvento = (turnoId) =>
+  supabase.from('cashier_shifts').select('id, event_id, operator_id, closed_at').eq('id', turnoId).maybeSingle();

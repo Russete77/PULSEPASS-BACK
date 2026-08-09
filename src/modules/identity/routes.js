@@ -87,6 +87,13 @@ router.delete('/menu-items/:itemId', asyncHandler(menu.menuDelete));
 router.get('/events/:id/cashier', asyncHandler(menu.cashierReport));
 router.get('/events/:id/ledger-check', asyncHandler(menu.ledgerCheck));
 
+// Turno de caixa. O caixa nunca ABRIA — existia o relatório por operador,
+// mas sem fundo de troco "sobrou R$ 300 na gaveta" não quer dizer nada.
+router.get('/events/:id/turno', asyncHandler(menu.turnoAberto));
+router.post('/events/:id/turno', asyncHandler(menu.turnoAbrir));
+router.get('/events/:id/turnos', asyncHandler(menu.turnosList));
+router.post('/turnos/:turnoId/fechar', asyncHandler(menu.turnoFechar));
+
 // Serviço de bar: cozinha (KDS), garçom e totem.
 // O ciclo paid → preparing → ready → delivered existia no banco desde a
 // migration 0003 e nunca teve por onde ser percorrido.

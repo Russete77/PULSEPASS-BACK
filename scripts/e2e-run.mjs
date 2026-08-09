@@ -31,6 +31,7 @@ const SUITES = [
   ['companions', 'acompanhantes na lista'],
   ['waitlist', 'fila de espera'],
   ['bar-service', 'garçom, cozinha e totem'],
+  ['caixa', 'turno de caixa e margem'],
   ['fiscal', 'notas fiscais'],
   ['audit', 'trilha de auditoria'],
   ['payment-events', 'estorno, chargeback e risco'],

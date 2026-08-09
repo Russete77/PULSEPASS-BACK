@@ -377,6 +377,13 @@ paths:
     get: { tags: [admin], summary: Listar reservas de camarote, parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }], responses: { "200": { description: reservas } } }
   /admin/reservations/{reservationId}:
     patch: { tags: [admin], summary: Confirmar/recusar reserva, parameters: [{ name: reservationId, in: path, required: true, schema: { type: string, format: uuid } }], responses: { "200": { description: reserva } } }
+  /admin/events/{id}/turno:
+    get: { tags: [admin], summary: Turno de caixa aberto do operador atual, parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }], responses: { "200": { description: turno ou null } } }
+    post: { tags: [admin], summary: Abre o turno com fundo de troco, parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }], responses: { "201": { description: turno aberto }, "409": { description: ja existe turno aberto } } }
+  /admin/events/{id}/turnos:
+    get: { tags: [admin], summary: Turnos do evento (conferencia de caixa), parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }], responses: { "200": { description: turnos } } }
+  /admin/turnos/{turnoId}/fechar:
+    post: { tags: [admin], summary: Fecha o turno e confere a gaveta, parameters: [{ name: turnoId, in: path, required: true, schema: { type: string, format: uuid } }], responses: { "200": { description: esperado, contado e diferenca } } }
   /admin/events/{id}/cashier:
     get: { tags: [admin], summary: Fechamento de caixa (por operador), parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }], responses: { "200": { description: fechamento } } }
   /admin/events/{id}/kds:
