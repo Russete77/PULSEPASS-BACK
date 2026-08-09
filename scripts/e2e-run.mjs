@@ -39,6 +39,7 @@ const SUITES = [
   ['billing', 'split e taxa da plataforma'],
   ['subaccount', 'subcontas Asaas'],
   ['cover', 'capa do evento'],
+  ['marca', 'white-label e acompanhantes'],
   ['seats', 'assento marcado e reserva temporária'],
 ];
 

@@ -236,7 +236,7 @@ export async function createBarOrder({ user, eventSlug, items, idempotencyKey = 
 }
 
 /** Núcleo reutilizável (cliente no app e PDV do operador). */
-export async function placeBarOrder({ buyerId, eventId, items, idempotencyKey = null, operatorId = null }) {
+export async function placeBarOrder({ buyerId, eventId, items, idempotencyKey = null, operatorId = null, station = null }) {
   const { data, error } = await repo.rpcPlaceBarOrder({ buyerId, eventId, items, idempotencyKey });
   if (error) {
     const mapped = mapBarError(error.message);
@@ -246,6 +246,11 @@ export async function placeBarOrder({ buyerId, eventId, items, idempotencyKey = 
   // Registra o operador do PDV (metadado, best-effort; nunca em replay).
   if (operatorId && data.order_id && !data.idempotent_replay) {
     try { await repo.setBarOrderOperator(data.order_id, operatorId); } catch { /* best-effort */ }
+  }
+  // A praça (gaveta) da venda — só no caminho do PDV; o do garçom grava a
+  // origem completa (mesa + garçom) por conta própria logo depois.
+  if (station && data.order_id && !data.idempotent_replay) {
+    try { await repo.setBarOrderOrigin(data.order_id, { station }); } catch { /* best-effort */ }
   }
   return {
     id: data.order_id, status: 'paid', total_cents: data.total_cents,

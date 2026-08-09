@@ -24,11 +24,19 @@ const login = async (e) => {
   return (await r.json()).access_token;
 };
 const api = async (m, p, { token, body } = {}) => {
-  const r = await fetch(API + p, {
+  const chamada = () => fetch(API + p, {
     method: m,
     headers: { 'content-type': 'application/json', ...(token ? { authorization: `Bearer ${token}` } : {}) },
     ...(body ? { body: JSON.stringify(body) } : {}),
   });
+  let r = await chamada();
+  // 429 é o limitador de borda, não resposta do domínio. Rodando as suítes em
+  // sequência do mesmo IP ele estoura, e um assert de autorização leria
+  // "bloqueado" pelo motivo errado. Respira e tenta de novo.
+  if (r.status === 429) {
+    await new Promise((s) => setTimeout(s, 1500));
+    r = await chamada();
+  }
   let j = null; try { j = await r.json(); } catch { /* sem corpo */ }
   return { status: r.status, body: j, data: j?.data };
 };

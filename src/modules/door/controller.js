@@ -50,6 +50,8 @@ export async function walletLookup(req, res) {
 const chargeSchema = z.object({
   email: z.string().email(),
   items: z.array(z.object({ menu_item_id: z.string().uuid(), quantity: z.number().int().positive() })).min(1),
+  // Praça do turno aberto — liga a venda à gaveta certa no fechamento.
+  station: z.string().trim().min(1).max(60).optional(),
 });
 export async function pdvCharge(req, res) {
   const p = chargeSchema.safeParse(req.body);

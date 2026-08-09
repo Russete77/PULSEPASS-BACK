@@ -128,14 +128,20 @@ export async function walletLookup({ user, eventId, email }) {
   if (!target) throw notFound('Cliente não encontrado com esse e-mail');
 
   const { data: wallet } = await repo.findWalletBalance(target.id);
-  return { customer_id: target.id, email: target.email, balance_cents: wallet?.balance_cents ?? 0 };
+  // O nome vai junto: cobrar a carteira certa exige conferir que a PESSOA é a
+  // certa, e "cliente@email.com" não confere ninguém no balcão.
+  return {
+    customer_id: target.id, email: target.email, name: target.full_name ?? null,
+    balance_cents: wallet?.balance_cents ?? 0,
+  };
 }
 
 /** PDV: operador debita o saldo do cliente (RPC transacional, idempotente). */
-export async function pdvCharge({ user, eventId, email, items, idempotencyKey = null }) {
+export async function pdvCharge({ user, eventId, email, items, idempotencyKey = null, station = null }) {
   await assertEventAccess(user.id, eventId, ROLE_BAR);
   const target = await repo.findProfileByEmail(email);
   if (!target) throw notFound('Cliente não encontrado');
-  // operatorId = o staff que operou o PDV (para o fechamento de caixa).
-  return placeBarOrder({ buyerId: target.id, eventId, items, idempotencyKey, operatorId: user.id });
+  // operatorId = o staff que operou o PDV (para o fechamento de caixa);
+  // station = a praça do turno aberto, para a venda pertencer a uma gaveta.
+  return placeBarOrder({ buyerId: target.id, eventId, items, idempotencyKey, operatorId: user.id, station });
 }

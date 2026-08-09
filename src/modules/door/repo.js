@@ -46,7 +46,10 @@ export const findManifestTickets = (eventId) =>
 
 export const findEventMenu = (eventId) =>
   supabase.from('menu_items')
-    .select('id, name, category, price_cents, available, position')
+    // `stock` no select: a RPC de venda já decrementa e recusa OUT_OF_STOCK,
+    // mas o operador vendia às cegas — descobria o fim do estoque no erro,
+    // com a fila formada. O número na tela evita a venda que vai falhar.
+    .select('id, name, category, price_cents, available, position, stock')
     .eq('event_id', eventId).eq('available', true).order('position', { ascending: true });
 
 // Carteira ÚNICA (0027): o saldo do cliente vive na carteira geral (event_id null).
