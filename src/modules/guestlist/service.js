@@ -120,7 +120,10 @@ export async function listEventGuests({ user, eventId }) {
   if (error) throw error;
   return (data ?? []).map((g) => ({
     id: g.id, name: g.name, email: g.email, phone: g.phone,
-    status: g.status, checked_in_at: g.checked_in_at, promoter: g.promoters?.name ?? null,
+    status: g.status, created_at: g.created_at, checked_in_at: g.checked_in_at,
+    promoter: g.promoters?.name ?? null,
+    // Tipo da LISTA, não da pessoa: 'vip' e 'birthday' viram badge na porta.
+    list_type: g.promoters?.list_type ?? null,
     // O porteiro precisa ver o grupo, não só a linha: "João +2, entraram 1".
     party_size: g.party_size ?? 1, checked_in_count: g.checked_in_count ?? 0,
   }));

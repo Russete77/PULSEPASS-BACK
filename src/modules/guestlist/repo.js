@@ -39,9 +39,12 @@ export const findGuestsByPromoter = (promoterId) =>
     .eq('promoter_id', promoterId).order('created_at', { ascending: false });
 
 // Todos os convidados de um EVENTO (para a portaria — busca + check-in).
+// created_at: a hora da inscrição diz se a lista encheu cedo ou em cima da
+// hora. list_type é da LISTA (vip, aniversário), não da pessoa — e é o que
+// sustenta o filtro "aniversariantes" sem inventar data de nascimento.
 export const findGuestsByEvent = (eventId) =>
   supabase.from('guests')
-    .select('id, name, email, phone, status, checked_in_at, party_size, checked_in_count, promoters(name)')
+    .select('id, name, email, phone, status, created_at, checked_in_at, party_size, checked_in_count, promoters(name, list_type)')
     .eq('event_id', eventId).order('name', { ascending: true });
 
 export const findGuestForCheckin = (guestId) =>
