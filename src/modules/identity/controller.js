@@ -179,3 +179,18 @@ export async function logoConfirm(req, res) {
 export async function logoRemove(req, res) {
   res.json({ data: await service.removeOrgLogo({ user: req.user, orgId: req.params.orgId }) });
 }
+
+
+/** Permissões granulares da equipe. */
+export async function staffPermissoes(req, res) {
+  res.json({
+    data: await service.setStaffPermissoes({
+      user: req.user, eventId: req.params.id, staffId: req.params.staffId,
+      permissoes: req.body?.permissoes,
+    }),
+  });
+}
+
+export async function permissoesCatalogo(_req, res) {
+  res.json({ data: service.listarPermissoes() });
+}

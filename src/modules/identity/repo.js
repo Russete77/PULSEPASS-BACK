@@ -64,8 +64,23 @@ export const findRecentPaidOrders = (eventId) =>
 // Equipe (RBAC)
 export const findEventStaff = (eventId) =>
   supabase.from('event_staff')
-    .select('id, role, created_at, profiles:user_id(id, full_name, email)')
+    .select('id, role, permissoes, created_at, profiles:user_id(id, full_name, email)')
     .eq('event_id', eventId).order('created_at', { ascending: true });
+
+/** As treze permissões que o sistema de fato tem. A lista mora aqui e no
+ *  CHECK do banco: a duplicação impede que um erro de digitação na API vire
+ *  permissão silenciosamente inexistente. */
+export const PERMISSOES = [
+  'door:checkin', 'door:reentry', 'door:guests',
+  'bar:pdv', 'bar:kds', 'bar:waiter', 'bar:menu',
+  'boxoffice:sell', 'boxoffice:refund',
+  'tables:manage', 'coupons:manage',
+  'finance:view', 'finance:withdraw',
+];
+
+export const updateStaffPermissoes = (staffId, eventId, permissoes) =>
+  supabase.from('event_staff').update({ permissoes })
+    .eq('id', staffId).eq('event_id', eventId).select().single();
 
 export const upsertEventStaff = (row) =>
   supabase.from('event_staff')

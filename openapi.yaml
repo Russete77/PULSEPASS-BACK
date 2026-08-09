@@ -301,6 +301,10 @@ paths:
       summary: Dashboard ao vivo (métricas)
       parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
       responses: { "200": { description: métricas } }
+  /admin/permissoes:
+    get: { tags: [admin], summary: Catalogo das permissoes granulares, responses: { "200": { description: lista } } }
+  /admin/events/{id}/staff/{staffId}/permissoes:
+    patch: { tags: [admin], summary: Ajusta as permissoes extras de um membro, parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }, { name: staffId, in: path, required: true, schema: { type: string, format: uuid } }], responses: { "200": { description: atualizado } } }
   /admin/events/{id}/staff:
     get: { tags: [admin], summary: Listar equipe (owner-only), parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }], responses: { "200": { description: equipe } } }
     post: { tags: [admin], summary: Adicionar staff (manager/door/bar), parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }], responses: { "201": { description: staff } } }

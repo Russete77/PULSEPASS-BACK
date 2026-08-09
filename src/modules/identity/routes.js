@@ -54,6 +54,9 @@ router.get('/events/:id/reconciliation', asyncHandler(ctrl.reconciliation));
 router.get('/events/:id/staff', asyncHandler(ctrl.listStaff));
 router.post('/events/:id/staff', asyncHandler(ctrl.addStaff));
 router.delete('/events/:id/staff/:staffId', asyncHandler(ctrl.removeStaff));
+// Permissões granulares: o papel define o padrão, isto é o ajuste fino.
+router.patch('/events/:id/staff/:staffId/permissoes', asyncHandler(ctrl.staffPermissoes));
+router.get('/permissoes', asyncHandler(ctrl.permissoesCatalogo));
 
 // Operação (porta / bar / PDV) — módulo door
 router.post('/events/:id/checkin', asyncHandler(ops.checkIn));

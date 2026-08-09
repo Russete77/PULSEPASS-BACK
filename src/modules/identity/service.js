@@ -202,6 +202,34 @@ export async function addEventStaff({ user, eventId, email, role }) {
   return data;
 }
 
+/**
+ * Ajusta as permissões extras de um membro.
+ *
+ * O papel continua definindo o padrão; isto é o ajuste fino por cima. Sem
+ * essa camada, dar acesso ao financeiro para o gerente de bar obrigava a
+ * promovê-lo a manager — e aí ele passava a poder despublicar o evento.
+ */
+export async function setStaffPermissoes({ user, eventId, staffId, permissoes }) {
+  await assertEventOwner(user.id, eventId);
+  if (!Array.isArray(permissoes)) throw badRequest('Envie a lista de permissões');
+
+  const invalidas = permissoes.filter((p) => !repo.PERMISSOES.includes(p));
+  if (invalidas.length) {
+    // Recusa antes de chegar ao CHECK do banco, para a mensagem dizer QUAL
+    // permissão não existe em vez de devolver violação de constraint.
+    throw badRequest(`Permissão desconhecida: ${invalidas.join(', ')}`);
+  }
+
+  const { data, error } = await repo.updateStaffPermissoes(staffId, eventId, [...new Set(permissoes)]);
+  if (error) throw error;
+  return data;
+}
+
+/** O catálogo, para a tela montar a matriz sem repetir a lista. */
+export function listarPermissoes() {
+  return repo.PERMISSOES;
+}
+
 export async function removeEventStaff({ user, eventId, staffId }) {
   await assertEventOwner(user.id, eventId);
   const { error } = await repo.deleteEventStaff(staffId, eventId);
