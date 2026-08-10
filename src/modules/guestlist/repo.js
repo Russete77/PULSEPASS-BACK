@@ -13,9 +13,11 @@ export const rpcPromoterDashboard = (userId) =>
 export const findPromoterOwned = (promoterId, userId) =>
   supabase.from('promoters').select('id, name, profile_id').eq('id', promoterId).eq('profile_id', userId).maybeSingle();
 
+// cover_url no select: a página do link do promoter é a tela mais pública do
+// produto, e estava sem a arte do evento — a capa existe desde a 0001.
 export const findPromoterByCodePublic = (code) =>
   supabase.from('promoters')
-    .select('id, name, code, list_type, free_until, event_id, events ( title, slug, venue_name, city, state, starts_at, status )')
+    .select('id, name, code, list_type, free_until, event_id, events ( title, slug, venue_name, city, state, starts_at, status, cover_url )')
     .eq('code', code).maybeSingle();
 
 export const findPromoterByCode = (code) =>
