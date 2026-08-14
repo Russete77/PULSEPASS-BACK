@@ -8,6 +8,7 @@ import * as ctrl from './controller.js';
 import * as ops from '../door/controller.js';
 import * as promoters from '../guestlist/controller.js';
 import * as coupons from '../coupons/controller.js';
+import * as marketing from '../marketing/controller.js';
 import * as menu from '../cashless/controller.js';
 import * as tables from '../tables/controller.js';
 import * as boxoffice from '../boxoffice/controller.js';
@@ -117,6 +118,12 @@ router.post('/events/:id/coupons', asyncHandler(coupons.create));
 router.get('/events/:id/coupons', asyncHandler(coupons.list));
 router.patch('/coupons/:couponId', asyncHandler(coupons.setActive));
 router.delete('/coupons/:couponId', asyncHandler(coupons.remove));
+
+// Campanhas de e-mail para o público do evento — módulo marketing
+router.get('/events/:id/marketing/segments', asyncHandler(marketing.segments));
+router.get('/events/:id/marketing/campaigns', asyncHandler(marketing.list));
+router.post('/events/:id/marketing/campaigns', asyncHandler(marketing.create));
+router.post('/marketing/campaigns/:campaignId/send', asyncHandler(marketing.send));
 
 // Guest list / promoters (AZList) — módulo guestlist
 router.post('/events/:id/promoters', asyncHandler(promoters.create));

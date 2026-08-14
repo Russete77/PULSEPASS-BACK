@@ -144,6 +144,45 @@ async function record({ orderId = null, to, status, attempts = 1, error = null, 
   }
 }
 
+/**
+ * Envio avulso — hoje usado pelas campanhas de marketing.
+ *
+ * Diferente de deliverTickets, aqui NÃO há retry. Uma campanha fala com muita
+ * gente de uma vez; insistir três vezes em cada endereço morto transforma um
+ * envio em meia hora de espera. Quem falhou fica registrado com o motivo e
+ * pode ser reenviado depois — a campanha guarda quem já recebeu.
+ *
+ * Sem RESEND_API_KEY não inventa: devolve mode 'mock' e quem chamou decide
+ * como mostrar isso. Nunca finge que saiu.
+ */
+export async function sendEmail({ to, subject, html, kind = 'campanha' }) {
+  if (!to || !subject || !html) return { sent: false, mode: 'mock', reason: 'nothing_to_send' };
+
+  if (!deliveryEnabled) {
+    return { sent: false, mode: 'mock', reason: 'not_configured' };
+  }
+
+  try {
+    const res = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${env.email.resendApiKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ from: env.email.from, to: [to], subject, html }),
+    });
+    if (!res.ok) {
+      const corpo = await res.text().catch(() => '');
+      const erro = `HTTP ${res.status} ${corpo.slice(0, 180)}`;
+      await record({ to, status: 'failed', error: erro, kind });
+      return { sent: false, mode: 'resend', reason: 'delivery_failed', error: erro };
+    }
+    const json = await res.json().catch(() => ({}));
+    await record({ to, status: 'sent', providerId: json?.id ?? null, kind });
+    return { sent: true, mode: 'resend', providerId: json?.id ?? null };
+  } catch (err) {
+    await record({ to, status: 'failed', error: err.message, kind });
+    return { sent: false, mode: 'resend', reason: 'delivery_failed', error: err.message };
+  }
+}
+
 /** Entregas de um pedido — o suporte usa pra responder "não recebi meu ingresso". */
 export async function deliveriesForOrder(orderId) {
   const { data } = await repo.findDeliveriesByOrder(orderId);
