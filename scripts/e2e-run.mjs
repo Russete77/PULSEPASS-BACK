@@ -41,6 +41,7 @@ const SUITES = [
   ['cover', 'capa do evento'],
   ['marca', 'white-label e acompanhantes'],
   ['seats', 'assento marcado e reserva temporária'],
+  ['transferencia', 'transferir ingresso e matar o QR antigo'],
 ];
 
 const PORTA = Number(process.env.PORT || 4000);

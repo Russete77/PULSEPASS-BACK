@@ -31,7 +31,8 @@ export const findOwnedTicket = (userId, ticketId) =>
 export const insertTransfer = (row) =>
   supabase.from('ticket_transfers').insert(row).select().single();
 
-export const setTicketOwner = (ticketId, ownerId) =>
-  supabase.from('tickets').update({ owner_id: ownerId, holder_name: null }).eq('id', ticketId);
+/** Transferência atômica: troca o dono E rotaciona code + qr_secret. */
+export const rpcTransferir = (ticketId, fromUser, email) =>
+  supabase.rpc('transferir_ingresso', { p_ticket: ticketId, p_from: fromUser, p_email: email });
 
 export { findProfileByEmail };

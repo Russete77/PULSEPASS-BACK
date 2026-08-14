@@ -38,32 +38,35 @@ export async function getMyTicketQrToken({ user, ticketId }) {
  * Transfere ingresso por e-mail. Lookup via profiles (sem listUsers paginado).
  * Se o destinatario tem conta, a posse muda na hora; senao fica pendente.
  */
+/**
+ * Transfere a titularidade do ingresso.
+ *
+ * A troca inteira mora numa RPC porque duas coisas precisam acontecer juntas
+ * ou não acontecer: passar o dono e ROTACIONAR code + qr_secret. Antes disso
+ * a aplicação só trocava o owner_id — e o print do QR no celular de quem
+ * transferiu continuava abrindo a porta. Quem recebia chegava e ouvia "já
+ * foi usado", porque o remetente tinha entrado com o mesmo ingresso.
+ */
 export async function transferTicket({ user, ticketId, toEmail }) {
-  if (!toEmail || !toEmail.includes('@')) throw badRequest('E-mail invalido');
+  if (!toEmail || !toEmail.includes('@')) throw badRequest('E-mail inválido');
 
-  const { data: ticket, error } = await repo.findOwnedTicket(user.id, ticketId);
-  if (error) throw error;
-  if (!ticket) throw notFound('Ingresso nao encontrado');
-  if (ticket.status !== 'valid') throw conflict('So e possivel transferir ingressos validos');
-
-  const target = await repo.findProfileByEmail(toEmail);
-
-  const { data: transfer, error: trErr } = await repo.insertTransfer({
-    ticket_id: ticket.id, from_user: user.id, to_email: toEmail.toLowerCase(),
-    to_user: target?.id ?? null, status: target ? 'accepted' : 'pending',
-    accepted_at: target ? new Date().toISOString() : null,
-  });
-  if (trErr) throw trErr;
-
-  if (target) {
-    await repo.setTicketOwner(ticket.id, target.id);
+  const { data, error } = await repo.rpcTransferir(ticketId, user.id, toEmail);
+  if (error) {
+    const m = error.message ?? '';
+    if (m.includes('INGRESSO_NAO_ENCONTRADO')) throw notFound('Ingresso não encontrado');
+    if (m.includes('NAO_E_SEU')) throw notFound('Ingresso não encontrado');
+    if (m.includes('JA_USADO')) throw conflict('Esse ingresso já entrou no evento — não dá para transferir depois da entrada.');
+    if (m.includes('INGRESSO_INVALIDO')) throw conflict('Só ingresso válido pode ser transferido.');
+    if (m.includes('PARA_SI_MESMO')) throw badRequest('Esse e-mail já é o seu.');
+    throw error;
   }
 
   return {
-    status: transfer.status,
-    delivered: Boolean(target),
-    message: target
-      ? 'Ingresso transferido com sucesso.'
-      : 'Convite registrado. A pessoa recebera o ingresso ao criar a conta com esse e-mail.',
+    status: data.status,
+    delivered: data.entregue,
+    code_novo: data.code_novo ?? null,
+    message: data.entregue
+      ? `Ingresso transferido para ${data.para}. Seu QR antigo deixou de valer agora.`
+      : 'Guardado para esse e-mail. O ingresso segue com você até a pessoa criar a conta — aí ele passa automaticamente.',
   };
 }
