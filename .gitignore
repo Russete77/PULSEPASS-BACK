@@ -7,3 +7,6 @@ dist/
 coverage/
 
 .vercel
+
+# Rascunhos de sessao (migrations avulsas, introspeccao)
+.tmp-*.mjs

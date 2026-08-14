@@ -133,10 +133,10 @@ export async function deliverTickets({ to, event, tickets, orderId = null }) {
 }
 
 /** Grava a tentativa. Nunca lança: registrar não pode derrubar uma venda paga. */
-async function record({ orderId = null, to, status, attempts = 1, error = null, providerId = null }) {
+async function record({ orderId = null, to, status, attempts = 1, error = null, providerId = null, kind = 'tickets' }) {
   try {
     await repo.insertDelivery({
-      order_id: orderId, to_email: to, kind: 'tickets',
+      order_id: orderId, to_email: to, kind,
       status, attempts, error: error ? String(error).slice(0, 500) : null, provider_id: providerId,
     });
   } catch (e) {
@@ -186,4 +186,33 @@ export async function notifyWaitlistInvite({ to, name, quantity = 1, ttlMinutes 
     await record({ to, status: 'failed', error: err.message });
     return { sent: false };
   }
+}
+
+// ── Central de notificações (0054) ──
+//
+// Complementa a entrega por e-mail acima: aquilo é ENTREGA, isto é REGISTRO.
+// Se o e-mail não chegou, foi para spam ou a pessoa apagou, o histórico
+// continua dentro do app.
+//
+// Nada aqui CRIA notificação: elas nascem de gatilhos sobre fatos que já
+// aconteceram (pagamento confirmado, transferência aceita). Deixar a
+// aplicação criá-las abriria espaço para aviso de coisa que não ocorreu.
+
+export async function listarMinhas({ user, limit = 50 }) {
+  const { data, error } = await repo.findMine(user.id, { limit });
+  if (error) throw error;
+  return data ?? [];
+}
+
+export async function contarNaoLidas({ user }) {
+  const { count, error } = await repo.countUnread(user.id);
+  if (error) throw error;
+  return { nao_lidas: count ?? 0 };
+}
+
+/** Sem ids, marca todas as minhas. O usuário vem do token, nunca do corpo. */
+export async function marcarLidas({ user, ids = null }) {
+  const { data, error } = await repo.rpcMarcarLidas(user.id, ids);
+  if (error) throw error;
+  return { marcadas: data ?? 0 };
 }
