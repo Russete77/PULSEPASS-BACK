@@ -10,3 +10,4 @@ coverage/
 
 # Rascunhos de sessao (migrations avulsas, introspeccao)
 .tmp-*.mjs
+scripts/tmp-*.mjs
