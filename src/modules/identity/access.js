@@ -33,3 +33,16 @@ export async function assertEventAccess(userId, eventId, roles = null, permissao
   if (!ok) throw forbidden('Sem acesso a este evento');
   return event;
 }
+
+/**
+ * Dono da organização. A checagem existia privada em identity/service.js;
+ * mora aqui porque guarda de acesso usada por mais de um módulo tem que
+ * viver num lugar só — duplicada, uma das cópias envelhece.
+ */
+export async function assertOrgOwner(userId, orgId) {
+  const { data } = await supabase
+    .from('organizations').select('id')
+    .eq('id', orgId).eq('owner_id', userId).maybeSingle();
+  if (!data) throw forbidden('Organização não pertence a você');
+  return data;
+}
