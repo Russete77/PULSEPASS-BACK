@@ -3,7 +3,7 @@ import { asaasMode } from '../modules/payments/provider.js';
 import { webhookHealth } from '../modules/payments/reconcile.js';
 import { supabase } from '../config/supabase.js';
 import { asyncHandler } from '../middleware/asyncHandler.js';
-import eventsRouter from '../modules/catalog/routes.js';
+import eventsRouter, { casasRouter } from '../modules/catalog/routes.js';
 import ordersRouter from '../modules/orders/routes.js';
 import ticketsRouter from '../modules/tickets/routes.js';
 import { walletRouter, barRouter } from '../modules/cashless/routes.js';
@@ -38,6 +38,8 @@ router.get('/health/ready', asyncHandler(async (_req, res) => {
 }));
 
 router.use('/events', eventsRouter);
+// Página pública da produtora (marca + agenda). Sem auth, como a vitrine.
+router.use('/casas', casasRouter);
 router.use('/orders', ordersRouter);
 router.use('/tickets', ticketsRouter);
 router.use('/wallet', walletRouter);

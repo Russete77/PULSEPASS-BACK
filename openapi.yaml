@@ -145,6 +145,17 @@ paths:
 
   /events/{slug}/waitlist:
     post: { tags: [catalog], security: [], summary: Entrar na fila de espera de um lote esgotado, parameters: [{ name: slug, in: path, required: true, schema: { type: string } }], responses: { "201": { description: posicao na fila }, "409": { description: lote ainda tem ingressos } } }
+  /casas/{slug}:
+    get:
+      tags: [catalog]
+      security: []
+      summary: Página pública da produtora — marca e agenda publicada
+      description: >-
+        Devolve apenas campos de marca (nome, slug, logo, cor, site, instagram)
+        e os eventos publicados e futuros da produtora. cnpj, asaas_wallet_id e
+        fee_bps nunca saem por aqui.
+      parameters: [{ name: slug, in: path, required: true, schema: { type: string } }]
+      responses: { "200": { description: casa, eventos e cidades }, "404": { description: produtora não encontrada } }
   /tickets:
     get: { tags: [tickets], summary: Meus ingressos, responses: { "200": { description: lista }, "401": { description: sem auth } } }
   /tickets/{id}:

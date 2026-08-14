@@ -22,4 +22,15 @@ router.post('/:slug/assentos/soltar', requireAuth, asyncHandler(seats.release));
 // Fila de espera de lote esgotado (público: quem quis comprar fica registrado)
 router.post('/:slug/waitlist', asyncHandler(waitlist.join));
 
+/**
+ * Página pública da produtora — montada em /casas, não sob /events.
+ *
+ * Não dá para pendurar em '/events/...': '/:slug' já engole qualquer
+ * caminho de um segmento, e uma casa não é um evento. Router próprio mantém
+ * a URL honesta (/api/casas/audio-club) e o módulo continua sendo o catalog,
+ * que é quem conhece o que pode ou não ser público.
+ */
+export const casasRouter = Router();
+casasRouter.get('/:slug', asyncHandler(ctrl.casa));
+
 export default router;

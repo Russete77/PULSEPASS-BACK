@@ -42,32 +42,92 @@ export async function listCities() {
   });
 }
 
+/**
+ * Card de evento da vitrine (preço mínimo, esgotado, % vendido, urgência).
+ *
+ * Extraído porque a página pública da produtora mostra os MESMOS cards. Se
+ * cada tela derivasse "esgotado" à sua maneira, o mesmo evento apareceria
+ * esgotado numa e à venda na outra — e a que erra é sempre a que o cliente viu.
+ */
+function resumirEvento(ev) {
+  const tiers = ev.ticket_tiers ?? [];
+  const onSale = tiers.filter((t) => t.status === 'on_sale' && (t.quantity_total - t.quantity_sold) > 0);
+  const prices = (onSale.length ? onSale : tiers).map((t) => t.price_cents).filter((p) => p != null);
+  const soldOut = tiers.length > 0 && onSale.length === 0;
+
+  // O percentual vendido é o que transforma um card em decisão. "87%
+  // vendido" faz comprar; nome e data, não. O dado sempre existiu nos
+  // lotes — era só ninguém somar.
+  const total = tiers.reduce((s, t) => s + (t.quantity_total ?? 0), 0);
+  const vendidos = tiers.reduce((s, t) => s + (t.quantity_sold ?? 0), 0);
+  const pct = total > 0 ? Math.round((vendidos / total) * 100) : 0;
+
+  const { ticket_tiers, ...rest } = ev;
+  return {
+    ...rest,
+    min_price_cents: prices.length ? Math.min(...prices) : null,
+    sold_out: soldOut,
+    sold_pct: pct,
+    // O selo só acende a partir de 70%. Abaixo disso "40% vendido" não
+    // apressa ninguém — e apressar sem motivo é o que gasta o selo para
+    // quando ele de fato importa.
+    urgencia: soldOut ? 'esgotado' : pct >= 70 ? 'esgotando' : null,
+  };
+}
+
 async function carregarVitrine({ city, q, category }) {
   const { data, error } = await repo.findPublishedEvents({ city, q, category });
   if (error) throw error;
-  return (data ?? []).map((ev) => {
-    const tiers = ev.ticket_tiers ?? [];
-    const onSale = tiers.filter((t) => t.status === 'on_sale' && (t.quantity_total - t.quantity_sold) > 0);
-    const prices = (onSale.length ? onSale : tiers).map((t) => t.price_cents).filter((p) => p != null);
-    const soldOut = tiers.length > 0 && onSale.length === 0;
+  return (data ?? []).map(resumirEvento);
+}
 
-    // O percentual vendido é o que transforma um card em decisão. "87%
-    // vendido" faz comprar; nome e data, não. O dado sempre existiu nos
-    // lotes — era só ninguém somar.
-    const total = tiers.reduce((s, t) => s + (t.quantity_total ?? 0), 0);
-    const vendidos = tiers.reduce((s, t) => s + (t.quantity_sold ?? 0), 0);
-    const pct = total > 0 ? Math.round((vendidos / total) * 100) : 0;
+/**
+ * Página pública da produtora (a "casa"): marca + agenda publicada.
+ *
+ * Existe porque a marca já estava no banco (migration 0042) e só aparecia
+ * espremida no topo do detalhe de UM evento. Quem descobre a casa por um
+ * evento não tinha para onde ir ver os outros — e é a casa, não o evento
+ * avulso, que a pessoa passa a seguir.
+ *
+ * Devolve APENAS campos de marca. cnpj, wallet do Asaas e taxa negociada
+ * ficam de fora já na consulta (repo.findOrgBySlug), como o detalhe público
+ * do evento já fazia com `organizations`.
+ */
+export async function getCasaBySlug(slug) {
+  return cached(`casa:${slug}`, VITRINE_TTL_MS, async () => {
+    const { data: org, error } = await repo.findOrgBySlug(slug);
+    if (error) throw error;
+    if (!org) throw notFound('Produtora não encontrada');
 
-    const { ticket_tiers, ...rest } = ev;
+    const { data: eventos, error: eErr } = await repo.findPublishedEventsByOrg(org.id);
+    if (eErr) throw eErr;
+    const agenda = (eventos ?? []).map(resumirEvento);
+
+    // Praças onde a casa tem evento no ar. Sai da agenda que já veio — não é
+    // consulta nova, e é a única "estatística" da casa que o banco sustenta.
+    const mapa = new Map();
+    for (const ev of agenda) {
+      if (!ev.city) continue;
+      const chave = `${ev.city}/${ev.state}`;
+      mapa.set(chave, (mapa.get(chave) ?? 0) + 1);
+    }
+
     return {
-      ...rest,
-      min_price_cents: prices.length ? Math.min(...prices) : null,
-      sold_out: soldOut,
-      sold_pct: pct,
-      // O selo só acende a partir de 70%. Abaixo disso "40% vendido" não
-      // apressa ninguém — e apressar sem motivo é o que gasta o selo para
-      // quando ele de fato importa.
-      urgencia: soldOut ? 'esgotado' : pct >= 70 ? 'esgotando' : null,
+      casa: {
+        nome: org.name,
+        slug: org.slug,
+        logo_url: org.logo_url ?? null,
+        cor: org.brand_color ?? null,
+        site: org.site_url ?? null,
+        instagram: org.instagram ?? null,
+      },
+      eventos: agenda,
+      cidades: [...mapa.entries()]
+        .map(([chave, qtd]) => {
+          const [city, state] = chave.split('/');
+          return { city, state, eventos: qtd };
+        })
+        .sort((a, b) => b.eventos - a.eventos || a.city.localeCompare(b.city, 'pt-BR')),
     };
   });
 }
@@ -85,10 +145,17 @@ export async function getEventBySlug(slug) {
   // A marca vai separada e enxuta: a página pública só precisa do que
   // desenha o cabeçalho. Devolver a organização inteira exporia campos que
   // não são da conta de quem está comprando.
+  //
+  // Antes a marca só existia quando havia logo OU cor. Agora ela sai sempre
+  // que a produtora existe, por um motivo de navegação: a `slug` é o que
+  // liga o evento à página pública da casa (/casa/:slug). Sem ela, a casa
+  // vira uma tela só alcançável por URL digitada — e quem descobriu a casa
+  // por um evento nunca chega aos outros.
   const { organizations, ...evento } = event;
-  const marca = organizations?.logo_url || organizations?.brand_color
+  const marca = organizations
     ? {
       nome: organizations.name,
+      slug: organizations.slug,
       logo_url: organizations.logo_url ?? null,
       cor: organizations.brand_color ?? null,
       site: organizations.site_url ?? null,

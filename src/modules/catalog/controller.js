@@ -20,6 +20,17 @@ export async function cities(req, res) {
   res.json({ data: await service.listCities() });
 }
 
+/**
+ * Página pública da produtora. Mesmo cache do catálogo: é conteúdo público e
+ * idêntico para todo mundo, e a agenda de uma casa muda em dias, não em
+ * segundos.
+ */
+export async function casa(req, res) {
+  const data = await service.getCasaBySlug(req.params.slug);
+  res.set('Cache-Control', 'public, max-age=30, stale-while-revalidate=60');
+  res.json({ data });
+}
+
 export async function detail(req, res) {
   const event = await service.getEventBySlug(req.params.slug);
   res.json({ data: event });
