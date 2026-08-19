@@ -232,7 +232,8 @@ begin
   select coalesce(sum(total_cents),0), count(*) into v_trev, v_orders
     from public.orders where event_id = p_event and status = 'paid';
   select coalesce(sum(total_cents),0) into v_brev
-    from public.bar_orders where event_id = p_event and status = 'paid';
+    -- Corrigido pela 0057 (era `status = 'paid'`) — ver nota na 0050.
+    from public.bar_orders where event_id = p_event and status <> 'cancelled';
   return jsonb_build_object(
     'tickets_sold', v_sold, 'checked_in', v_checked,
     'ticket_revenue_cents', v_trev, 'bar_revenue_cents', v_brev,

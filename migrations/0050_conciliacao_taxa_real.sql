@@ -62,9 +62,14 @@ begin
     into v_ref_cnt, v_ref
     from public.orders where event_id = p_event and status = 'refunded';
 
+  -- Corrigido pela 0057 (era `status = 'paid'`): o status da comanda avança
+  -- pelo preparo, então somar só 'paid' fazia a receita do bar encolher
+  -- conforme a cozinha entregava. Corrigido AQUI também porque este arquivo
+  -- é `create or replace`: aplicado fora de ordem depois da 0057, ele
+  -- reinstalava o bug — foi o que aconteceu em 19/08/2026.
   select coalesce(sum(total_cents), 0)
     into v_bar
-    from public.bar_orders where event_id = p_event and status = 'paid';
+    from public.bar_orders where event_id = p_event and status <> 'cancelled';
 
   return jsonb_build_object(
     'tickets_gross_cents', v_gross,

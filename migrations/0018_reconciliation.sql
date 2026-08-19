@@ -21,7 +21,8 @@ begin
 
   select coalesce(sum(total_cents), 0)
     into v_bar
-    from public.bar_orders where event_id = p_event and status = 'paid';
+    -- Corrigido pela 0057 (era `status = 'paid'`) — ver nota na 0050.
+    from public.bar_orders where event_id = p_event and status <> 'cancelled';
 
   return jsonb_build_object(
     'tickets_gross_cents', v_gross,

@@ -13,7 +13,8 @@ returns table(operator_id uuid, operator_name text, operator_email text, orders 
   select b.operator_id, pr.full_name, pr.email, count(*) as orders, coalesce(sum(b.total_cents), 0) as total_cents
     from public.bar_orders b
     join public.profiles pr on pr.id = b.operator_id
-   where b.event_id = p_event and b.operator_id is not null and b.status = 'paid'
+   -- Corrigido pela 0057 (era `b.status = 'paid'`) — ver nota na 0050.
+   where b.event_id = p_event and b.operator_id is not null and b.status <> 'cancelled'
    group by b.operator_id, pr.full_name, pr.email
    order by sum(b.total_cents) desc;
 $$ language sql security definer set search_path = public, pg_temp;
