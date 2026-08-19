@@ -82,16 +82,30 @@ jobs:
           SECRET_BOX_KEY: e2e-chave-de-teste-nao-usar-em-producao
           TICKET_QR_SECRET: e2e-qr-secret
 
+      # Sem segredos o job PULAVA e passava verde — em qualquer contexto. Isso
+      # transformou o CI num carimbo: verde porque não rodou, indistinguível de
+      # verde porque passou. No branch principal, segredo ausente é
+      # configuração quebrada e precisa doer.
+      #
+      # Fork e PR de fora seguem só avisando: lá o segredo é inacessível por
+      # desenho, e vermelho permanente por motivo estrutural vira ruído até as
+      # pessoas pararem de olhar o CI inteiro.
       - name: Sem segredos — o que falta
         if: steps.cofre.outputs.tem != 'sim'
+        env:
+          E_NOSSO: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && github.repository == github.event.repository.full_name }}
         run: |
-          echo "::warning title=E2E não rodou::Configure os segredos do repositório para ligar as 13 áreas."
           echo "Faltam um ou mais destes em Settings → Secrets and variables → Actions:"
           echo "  TEST_SUPABASE_URL"
           echo "  TEST_SUPABASE_SERVICE_ROLE_KEY"
           echo "  TEST_SUPABASE_ANON_KEY"
           echo ""
           echo "Use um projeto Supabase SEPARADO do de produção: a semeadura apaga e recria o cenário."
+          if [ "$E_NOSSO" = "true" ]; then
+            echo "::error title=E2E não rodou::As 13 áreas não foram exercitadas neste push para main."
+            exit 1
+          fi
+          echo "::warning title=E2E não rodou::Configure os segredos para ligar as 13 áreas."
 
   docker:
     runs-on: ubuntu-latest
