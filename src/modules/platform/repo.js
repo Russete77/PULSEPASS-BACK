@@ -20,8 +20,12 @@ export const recentOrders = (limit = 40) =>
 export const recentEvents = (limit = 20) =>
   supabase.from('events').select('id, title, status, created_at, organizations(name)').order('created_at', { ascending: false }).limit(limit);
 
+// `neq('cancelled')` e não `eq('paid')`: o status da comanda avança pelo
+// preparo (paid → preparing → ready → delivered). Filtrar por 'paid' fazia o
+// GMV do bar encolher conforme a cozinha entregava — o mesmo furo da 0057,
+// aqui fora do banco. Cancelada é o único estado que não foi venda.
 export const barOrdersLite = () =>
-  supabase.from('bar_orders').select('id, event_id, total_cents, created_at').eq('status', 'paid');
+  supabase.from('bar_orders').select('id, event_id, total_cents, created_at').neq('status', 'cancelled');
 
 export const ticketsCount = () =>
   supabase.from('tickets').select('id', { count: 'exact', head: true });

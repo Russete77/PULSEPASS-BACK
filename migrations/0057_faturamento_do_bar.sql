@@ -19,6 +19,13 @@
 -- A correção é somar tudo que não foi cancelado. Dinheiro entrou quando a
 -- comanda foi paga; o que acontece com o prato depois é operação, não caixa.
 -- `cancelled` é o único estado do enum que significa "não houve venda".
+--
+-- Atingidos (varredura em pg_proc por tudo que soma bar_orders.total_cents):
+--   • event_dashboard      — painel ao vivo
+--   • event_reconciliation — conciliação financeira do evento
+--   • cashier_report       — fechamento de gaveta por operador
+-- O mesmo filtro existia fora do banco, em src/modules/platform/repo.js
+-- (GMV do god-mode); corrigido no mesmo commit.
 -- ═══════════════════════════════════════════════════════════
 
 -- ── Painel ao vivo ──
@@ -101,5 +108,25 @@ $$ language plpgsql security definer set search_path = public, pg_temp;
 
 revoke execute on function public.event_reconciliation(uuid) from public, anon, authenticated;
 grant  execute on function public.event_reconciliation(uuid) to service_role;
+
+-- ── Fechamento de caixa por operador ──
+-- Mesmo furo, consequência pior: aqui o número vira acusação. O relatório
+-- serve pra conferir a gaveta do operador contra o que o sistema registrou.
+-- Somando só 'paid', tudo que ele vendeu e o bar já entregou some do lado do
+-- sistema — e a conferência acusa uma FALTA que o operador nunca causou.
+-- No banco de demonstração, um operador com R$ 2.276,00 em comandas aparecia
+-- com R$ 343,00: R$ 1.933,00 de "diferença de caixa" puramente contábil.
+create or replace function public.cashier_report(p_event uuid)
+returns table(operator_id uuid, operator_name text, operator_email text, orders bigint, total_cents bigint) as $$
+  select b.operator_id, pr.full_name, pr.email, count(*) as orders, coalesce(sum(b.total_cents), 0) as total_cents
+    from public.bar_orders b
+    join public.profiles pr on pr.id = b.operator_id
+   where b.event_id = p_event and b.operator_id is not null and b.status <> 'cancelled'
+   group by b.operator_id, pr.full_name, pr.email
+   order by sum(b.total_cents) desc;
+$$ language sql security definer set search_path = public, pg_temp;
+
+revoke execute on function public.cashier_report(uuid) from public, anon, authenticated;
+grant  execute on function public.cashier_report(uuid) to service_role;
 
 -- ═══════════════════════════════════════════════════════════
