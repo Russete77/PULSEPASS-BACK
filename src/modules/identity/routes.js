@@ -17,6 +17,7 @@ import * as auditCtrl from '../audit/controller.js';
 import * as billingCtrl from '../billing/controller.js';
 import * as waitlistCtrl from '../waitlist/controller.js';
 import * as seatsCtrl from '../seats/controller.js';
+import * as integracoes from '../integracoes/controller.js';
 
 const router = Router();
 router.use(requireAuth);
@@ -36,6 +37,21 @@ router.get('/organizations/:orgId/repasse', asyncHandler(billingCtrl.transparenc
 // Subconta Asaas: a produtora cria a propria conta sem sair do cockpit.
 router.post('/organizations/:orgId/asaas-subaccount', asyncHandler(billingCtrl.createSubaccount));
 router.post('/organizations/:orgId/asaas-subaccount/refresh', asyncHandler(billingCtrl.refreshSubaccount));
+
+// Integrações: chaves de API e webhooks. Ficam sob a ORGANIZAÇÃO, não sob o
+// evento nem sob /platform — a chave é da produtora, e o dado que ela abre é o
+// da casa inteira. Quem emite é o dono da organização (ver assertOrgOwner).
+router.get('/organizations/:orgId/api-keys', asyncHandler(integracoes.listarChaves));
+router.post('/organizations/:orgId/api-keys', asyncHandler(integracoes.criarChave));
+router.delete('/organizations/:orgId/api-keys/:chaveId', asyncHandler(integracoes.revogarChave));
+
+router.get('/organizations/:orgId/webhooks', asyncHandler(integracoes.listarWebhooks));
+router.post('/organizations/:orgId/webhooks', asyncHandler(integracoes.criarWebhook));
+router.patch('/organizations/:orgId/webhooks/:assinaturaId', asyncHandler(integracoes.pausarWebhook));
+router.delete('/organizations/:orgId/webhooks/:assinaturaId', asyncHandler(integracoes.removerWebhook));
+router.post('/organizations/:orgId/webhooks/:assinaturaId/secret', asyncHandler(integracoes.rotacionarSecret));
+// Reprocesso: sem fila de jobs, é assim que o que ficou parado volta a sair.
+router.post('/organizations/:orgId/webhooks/:assinaturaId/reprocessar', asyncHandler(integracoes.reprocessar));
 
 router.get('/events', asyncHandler(ctrl.listEvents));
 router.post('/events', asyncHandler(ctrl.createEvent));

@@ -14,6 +14,7 @@ import listsRouter, { promoterRouter } from '../modules/guestlist/routes.js';
 import tablesRouter from '../modules/tables/routes.js';
 import webhooksRouter from '../modules/payments/routes.js';
 import platformRouter from '../modules/platform/routes.js';
+import pubRouter from '../modules/integracoes/routes.js';
 
 const router = Router();
 
@@ -55,5 +56,8 @@ router.use('/promoter', promoterRouter);
 router.use('/tables', tablesRouter);
 router.use('/webhooks', webhooksRouter);
 router.use('/platform', platformRouter);
+// API pública da produtora. Autentica por CHAVE (pp_live_…), não por token de
+// pessoa — por isso caminho próprio, e não uma variante de /admin.
+router.use('/pub', pubRouter);
 
 export default router;

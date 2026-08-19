@@ -7,6 +7,7 @@ import * as asaas from '../payments/provider.js';
 import { deliverTickets, deliveriesForOrder } from '../notifications/service.js';
 import { issueForOrder, cancelForOrder as cancelFiscalForOrder } from '../fiscal/service.js';
 import { inviteForOrder as inviteWaitlistForOrder } from '../waitlist/service.js';
+import { despacharEmSegundoPlano } from '../integracoes/service.js';
 import { logger } from '../../lib/logger.js';
 import * as repo from './repo.js';
 
