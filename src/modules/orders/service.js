@@ -252,6 +252,15 @@ export async function markOrderPaidByPaymentId(asaasPaymentId, paidValueCents = 
     if (env.fiscal.autoIssue) {
       issueForOrder(data.orderId).catch((e) => logger.warn('fiscal: emissão automática falhou', { error: e.message }));
     }
+
+    // Webhooks. Os gatilhos do banco já ENFILEIRARAM o aviso na confirmação;
+    // isto só empurra a fila agora, para o sistema da produtora saber da venda
+    // em segundos em vez de esperar o próximo movimento do evento.
+    //
+    // Sem fila de jobs no projeto, este é o gatilho do despacho — por isso ele
+    // é melhor esforço e nunca entra no caminho da resposta: webhook lento não
+    // pode segurar a confirmação de um pagamento que já aconteceu.
+    despacharEmSegundoPlano();
   }
   return data;
 }

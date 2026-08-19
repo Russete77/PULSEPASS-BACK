@@ -433,6 +433,43 @@ paths:
     post: { tags: [admin], summary: Cria a subconta Asaas da produtora (devolve walletId para o split), parameters: [{ name: orgId, in: path, required: true, schema: { type: string, format: uuid } }], responses: { "201": { description: subconta criada }, "409": { description: ja existe } } }
   /admin/organizations/{orgId}/asaas-subaccount/refresh:
     post: { tags: [admin], summary: Reconsulta o status de aprovacao da subconta, parameters: [{ name: orgId, in: path, required: true, schema: { type: string, format: uuid } }], responses: { "200": { description: status } } }
+  /admin/events/{id}/marketing/segments:
+    get: { tags: [admin], summary: Tamanho de cada segmento de publico (consultado na hora, nao estimado), parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }], responses: { "200": { description: segmentos com contagem real } } }
+  /admin/events/{id}/marketing/campaigns:
+    get: { tags: [admin], summary: Historico de campanhas do evento, parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }], responses: { "200": { description: campanhas } } }
+    post: { tags: [admin], summary: Cria campanha como rascunho, parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }], responses: { "201": { description: rascunho criado } } }
+  /admin/marketing/campaigns/{campaignId}/send:
+    post: { tags: [admin], summary: "Dispara a campanha. Sem RESEND_API_KEY grava mode=mock e nenhum e-mail sai", parameters: [{ name: campaignId, in: path, required: true, schema: { type: string, format: uuid } }], responses: { "200": { description: enviada ou simulada }, "409": { description: ja enviada } } }
+  /admin/organizations/{orgId}/api-keys:
+    get: { tags: [admin], summary: "Chaves da produtora. Devolve o PREFIXO, nunca a chave", parameters: [{ name: orgId, in: path, required: true, schema: { type: string, format: uuid } }], responses: { "200": { description: chaves } } }
+    post: { tags: [admin], summary: "Cria chave. A chave em claro vem UMA vez e nao e recuperavel depois", parameters: [{ name: orgId, in: path, required: true, schema: { type: string, format: uuid } }], responses: { "201": { description: chave criada (unica exibicao) } } }
+  /admin/organizations/{orgId}/api-keys/{chaveId}:
+    delete: { tags: [admin], summary: Revoga a chave (deixa de autenticar na hora), parameters: [{ name: orgId, in: path, required: true, schema: { type: string, format: uuid } }, { name: chaveId, in: path, required: true, schema: { type: string, format: uuid } }], responses: { "200": { description: revogada } } }
+  /admin/organizations/{orgId}/webhooks:
+    get: { tags: [admin], summary: Assinaturas de webhook e entregas recentes, parameters: [{ name: orgId, in: path, required: true, schema: { type: string, format: uuid } }], responses: { "200": { description: assinaturas, entregas e catalogo de eventos } } }
+    post: { tags: [admin], summary: "Assina eventos numa URL. Destino privado/loopback/link-local e recusado (SSRF)", parameters: [{ name: orgId, in: path, required: true, schema: { type: string, format: uuid } }], responses: { "201": { description: assinatura criada com secret (unica exibicao) }, "400": { description: destino nao permitido } } }
+  /admin/organizations/{orgId}/webhooks/{assinaturaId}:
+    patch: { tags: [admin], summary: Pausa ou retoma a assinatura, parameters: [{ name: orgId, in: path, required: true, schema: { type: string, format: uuid } }, { name: assinaturaId, in: path, required: true, schema: { type: string, format: uuid } }], responses: { "200": { description: atualizada } } }
+    delete: { tags: [admin], summary: Remove a assinatura, parameters: [{ name: orgId, in: path, required: true, schema: { type: string, format: uuid } }, { name: assinaturaId, in: path, required: true, schema: { type: string, format: uuid } }], responses: { "200": { description: removida } } }
+  /admin/organizations/{orgId}/webhooks/{assinaturaId}/secret:
+    post: { tags: [admin], summary: "Rotaciona o secret. O anterior deixa de assinar na hora", parameters: [{ name: orgId, in: path, required: true, schema: { type: string, format: uuid } }, { name: assinaturaId, in: path, required: true, schema: { type: string, format: uuid } }], responses: { "200": { description: novo secret (unica exibicao) } } }
+  /admin/organizations/{orgId}/webhooks/{assinaturaId}/reprocessar:
+    post: { tags: [admin], summary: Reenfileira entregas que falharam, parameters: [{ name: orgId, in: path, required: true, schema: { type: string, format: uuid } }, { name: assinaturaId, in: path, required: true, schema: { type: string, format: uuid } }], responses: { "200": { description: contagem de reenfileiradas e processadas } } }
+  /admin/organizations/{orgId}/fidelidade:
+    get: { tags: [admin], summary: "Regra do programa de pontos. Ausente = nunca configurado (nasce inativo)", parameters: [{ name: orgId, in: path, required: true, schema: { type: string, format: uuid } }], responses: { "200": { description: config } } }
+    patch: { tags: [admin], summary: "Define a regra. Ativar exige pontos_por_real E centavos_por_ponto maiores que zero", parameters: [{ name: orgId, in: path, required: true, schema: { type: string, format: uuid } }], responses: { "200": { description: config salva }, "400": { description: regra incompleta } } }
+  /fidelidade/programas:
+    get: { tags: [cliente], summary: Produtoras com programa de pontos ativo, responses: { "200": { description: programas } } }
+  /fidelidade/{orgId}/saldo:
+    get: { tags: [cliente], summary: Meu saldo de pontos e extrato nesta produtora, parameters: [{ name: orgId, in: path, required: true, schema: { type: string, format: uuid } }], responses: { "200": { description: saldo e extrato }, "404": { description: programa inativo } } }
+  /fidelidade/{orgId}/resgatar:
+    post: { tags: [cliente], summary: "Resgata pontos. Recusa acima do saldo e abaixo do minimo", parameters: [{ name: orgId, in: path, required: true, schema: { type: string, format: uuid } }], responses: { "200": { description: valor resgatado e saldo restante }, "400": { description: saldo insuficiente ou abaixo do minimo } } }
+  /notificacoes:
+    get: { tags: [cliente], summary: Minhas notificacoes, mais recentes primeiro, responses: { "200": { description: notificacoes } } }
+  /notificacoes/nao-lidas:
+    get: { tags: [cliente], summary: Contador do sininho, responses: { "200": { description: quantidade nao lida } } }
+  /notificacoes/lidas:
+    post: { tags: [cliente], summary: "Marca como lidas. Sem ids, marca todas as minhas", responses: { "200": { description: quantas foram marcadas } } }
   /admin/organizations/{orgId}/repasse:
     get: { tags: [admin], summary: Transparencia do repasse (como o dinheiro e calculado), parameters: [{ name: orgId, in: path, required: true, schema: { type: string, format: uuid } }], responses: { "200": { description: explicacao e exemplo } } }
   /admin/events/{id}/fraud-cases:

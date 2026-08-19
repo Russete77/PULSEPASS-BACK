@@ -6,7 +6,8 @@ export function notFoundHandler(_req, res) {
   res.status(404).json({ error: { message: 'Rota não encontrada' } });
 }
 
-// eslint-disable-next-line no-unused-vars
+// O 4º parâmetro é o que faz o Express reconhecer isto como handler de erro,
+// mesmo sem ser usado — por isso o nome com underline, que a regra já ignora.
 export function errorHandler(err, req, res, _next) {
   const isApi = err instanceof ApiError;
   const status = isApi ? err.status : 500;

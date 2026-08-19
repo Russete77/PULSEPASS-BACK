@@ -253,7 +253,8 @@ const EXTENSOES = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp
  * sob qual caminho; o Storage impõe tipo e tamanho.
  */
 export async function createCoverUpload({ user, eventId, contentType }) {
-  const event = await assertEventAccess(user.id, eventId, ['manager']);
+  // Chamada pelo efeito: autoriza ou lança. O retorno não é usado aqui.
+  await assertEventAccess(user.id, eventId, ['manager']);
   const ext = EXTENSOES[contentType];
   if (!ext) throw badRequest('Formato não aceito. Use JPG, PNG, WebP ou AVIF.');
 
