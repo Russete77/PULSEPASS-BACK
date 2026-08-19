@@ -129,11 +129,16 @@ export const findOpenOrdersByTable = (eventId) =>
 
 export const rpcCashierReport = (eventId) => supabase.rpc('cashier_report', { p_event: eventId });
 
-// Integridade do ledger: carteiras cujo saldo diverge da soma das transações.
-export const findLedgerDrift = (eventId) =>
-  supabase.from('wallet_reconciliation')
-    .select('wallet_id, profile_id, balance_cents, ledger_cents, drift_cents')
-    .eq('event_id', eventId).neq('drift_cents', 0);
+/**
+ * Integridade do ledger: carteiras cujo saldo diverge da soma das transações.
+ *
+ * Não dá para filtrar `wallet_reconciliation` por `event_id`: desde a 0027 a
+ * carteira é ÚNICA por usuário e nasce com `event_id` nulo — o filtro por
+ * evento não casa com nada e a conferência respondia "tudo certo" sempre.
+ * O vínculo carteira↔evento vive em `bar_orders`, e é a RPC que o percorre.
+ */
+export const rpcConferenciaCarteiras = (eventId) =>
+  supabase.rpc('conferencia_carteiras_evento', { p_event: eventId });
 
 export const findMyBarOrders = (userId, { limit = 50, offset = 0 } = {}) =>
   supabase.from('bar_orders')

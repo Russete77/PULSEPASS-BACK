@@ -12,7 +12,30 @@ export function createApp() {
 
   app.set('trust proxy', 1); // IP correto atrás de proxy/load balancer
   app.use(helmet());
-  app.use(cors({ origin: env.corsOrigin, credentials: true }));
+  /**
+   * Origem permitida: lista exata + sufixos do time.
+   *
+   * A lista exata cobre os domínios estáveis. O sufixo cobre as URLs que a
+   * Vercel gera por deploy — sem ele, cada publicação derrubava o app com
+   * erro de CORS até alguém lembrar de editar a variável.
+   *
+   * Requisição sem Origin (curl, health check da plataforma, webhook do
+   * provedor) passa: CORS é proteção de NAVEGADOR, e recusar aqui só
+   * quebraria integração legítima sem impedir ninguém.
+   */
+  app.use(cors({
+    credentials: true,
+    origin(origin, cb) {
+      if (!origin) return cb(null, true);
+      const o = origin.toLowerCase();
+      const permitido = env.corsOrigin.includes(origin)
+        || env.corsOriginSuffix.some((sufixo) => o.endsWith(sufixo));
+      // Não lançar erro: `cb(null, false)` responde sem o cabeçalho e o
+      // navegador bloqueia, que é o comportamento correto. Lançar viraria 500
+      // e esconderia a causa real atrás de "erro interno".
+      return cb(null, permitido);
+    },
+  }));
   app.use(express.json({ limit: '1mb' }));
   if (!env.isProd) app.use(morgan('dev'));
 

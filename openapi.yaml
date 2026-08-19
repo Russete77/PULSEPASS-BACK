@@ -496,7 +496,7 @@ paths:
   /admin/events/{id}/box-office/report:
     get: { tags: [admin], summary: Fechamento do caixa da bilheteria (por forma e operador), parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }], responses: { "200": { description: fechamento } } }
   /admin/events/{id}/ledger-check:
-    get: { tags: [admin], summary: Integridade do ledger (drift de saldo), parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }], responses: { "200": { description: resultado } } }
+    get: { tags: [admin], summary: Integridade do ledger das carteiras que movimentaram no evento, parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }], responses: { "200": { description: "status (ok|divergencias|sem_movimento), carteiras conferidas e divergencias" } } }
   /admin/events/{id}/assentos:
     post: { tags: [admin], summary: Gera a grade de assentos de um setor (fileiras x assentos), parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }], responses: { "201": { description: assentos criados } } }
   /admin/events/{id}/reconciliation:

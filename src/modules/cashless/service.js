@@ -258,12 +258,27 @@ export async function placeBarOrder({ buyerId, eventId, items, idempotencyKey = 
   };
 }
 
-/** Integridade do ledger — carteiras com saldo divergente da soma das transações. */
+/**
+ * Integridade do ledger — carteiras com saldo divergente da soma das transações.
+ *
+ * O escopo é "quem movimentou a carteira NESTE evento" (as comandas do bar),
+ * porque com carteira única (0027) não existe carteira "do evento". O número
+ * de carteiras conferidas vai junto de propósito: sem ele, um evento sem
+ * nenhum consumo responderia "sem divergências", que é a mesma mentira que
+ * este endpoint passou meses contando. `status` separa os três casos.
+ */
 export async function getLedgerCheck({ user, eventId }) {
   await assertEventAccess(user.id, eventId, ['manager']);
-  const { data, error } = await repo.findLedgerDrift(eventId);
+  const { data, error } = await repo.rpcConferenciaCarteiras(eventId);
   if (error) throw error;
-  return { ok: (data ?? []).length === 0, drifts: data ?? [] };
+  const conferidas = Number(data?.carteiras_conferidas ?? 0);
+  const drifts = data?.drifts ?? [];
+  return {
+    status: conferidas === 0 ? 'sem_movimento' : drifts.length > 0 ? 'divergencias' : 'ok',
+    conferidas,
+    ok: drifts.length === 0,   // "nada divergente no que foi conferido"
+    drifts,
+  };
 }
 
 /** Fechamento de caixa — total processado por operador de PDV. */

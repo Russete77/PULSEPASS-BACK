@@ -123,6 +123,24 @@ async function main() {
   const oItem = lista.data?.find((i) => i.id === item.data?.id);
   check('a listagem devolve o custo', oItem?.cost_cents === 400);
 
+  // A conferência de carteira é a checagem de integridade do cashless: o
+  // saldo de cada carteira tem que bater com o extrato. Ela passou meses
+  // filtrando `wallet_reconciliation` por `event_id`, coluna que a migration
+  // 0027 (carteira única) deixou sempre nula — a consulta não voltava linha
+  // nenhuma e a tela assinava "sem divergências" por baixo de qualquer rombo.
+  console.log('\n6) Conferência de carteira (integridade do ledger)');
+  const lc = await api('GET', `/admin/events/${ev.id}/ledger-check`, { token: produtora });
+  check('conferência responde', lc.status === 200);
+  check('diz QUANTAS carteiras conferiu', Number.isInteger(lc.data?.conferidas), `${lc.data?.conferidas}`);
+  check('separa os três casos', ['ok', 'divergencias', 'sem_movimento'].includes(lc.data?.status), lc.data?.status);
+  // O invariante que faltava: "tudo certo" só pode ser dito sobre alguma coisa.
+  check('"tudo certo" só quando houve o que conferir', lc.data?.status !== 'ok' || lc.data?.conferidas > 0,
+    `status ${lc.data?.status} · ${lc.data?.conferidas} carteira(s)`);
+  check('lista de divergências coerente com o status',
+    (lc.data?.drifts?.length > 0) === (lc.data?.status === 'divergencias'));
+  const lcCliente = await api('GET', `/admin/events/${ev.id}/ledger-check`, { token: cliente });
+  check('cliente não enxerga a conferência', lcCliente.status === 403, `HTTP ${lcCliente.status}`);
+
   // Limpa o que este teste criou.
   for (const id of [item.data?.id, semCusto.data?.id]) {
     if (id) await api('DELETE', `/admin/menu-items/${id}`, { token: produtora });

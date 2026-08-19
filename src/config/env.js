@@ -13,7 +13,33 @@ export const env = {
   isProd: process.env.NODE_ENV === 'production',
   corsOrigin: (process.env.CORS_ORIGIN ?? 'http://localhost:5173')
     .split(',')
-    .map((s) => s.trim()),
+    .map((s) => s.trim())
+    .filter(Boolean),
+
+  /**
+   * Sufixos de domínio aceitos ALÉM da lista exata.
+   *
+   * A Vercel dá uma URL nova a cada deploy
+   * (`pulsepass-admin-448i1gf7m-russete77s-projects.vercel.app`), então lista
+   * exata nunca acompanha: todo deploy quebraria o app com erro de CORS até
+   * alguém editar a variável à mão.
+   *
+   * CUIDADO COM O QUE SE COLOCA AQUI. A Vercel separa o time por HÍFEN, não
+   * por ponto — o sufixo do time é `-russete77s-projects.vercel.app`. Hífen
+   * não é fronteira de domínio como o ponto é: alguém que crie um projeto
+   * chamado `x-russete77s-projects` recebe `x-russete77s-projects.vercel.app`,
+   * que termina com esse mesmo sufixo. Ou seja, isto NÃO é garantia
+   * criptográfica de origem — é conveniência de ambiente de teste.
+   *
+   * Por isso: use em preview, e mantenha só os domínios ESTÁVEIS em
+   * CORS_ORIGIN quando o app for pra produção de verdade.
+   *
+   * `.vercel.app` sozinho é recusado sempre: liberaria a internet inteira.
+   */
+  corsOriginSuffix: (process.env.CORS_ORIGIN_SUFFIX ?? '')
+    .split(',')
+    .map((s) => s.trim().toLowerCase())
+    .filter((s) => s && !/^\.?vercel\.app$/.test(s) && s.length > 12),
 
   supabase: {
     url: required('SUPABASE_URL'),
